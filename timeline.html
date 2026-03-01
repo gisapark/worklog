@@ -39,9 +39,90 @@
   .cellText{flex:1;min-width:0}
   .cellBtn{width:84px;text-align:right}
   .empty{opacity:.7;padding:12px 0}
-</style>
+
+/* === WHITE ERP THEME (global override) === */
+:root{
+  --bg:#f8fafc;
+  --panel:#ffffff;
+  --card:#ffffff;
+  --text:#111827;
+  --muted:#6b7280;
+  --line:#e5e7eb;
+  --blue:#2563eb;
+  --red:#ef4444;
+}
+body{background:var(--bg) !important; color:var(--text) !important;}
+.card{background:var(--card) !important; border:1px solid var(--line) !important;}
+input,select,textarea{
+  background:#ffffff !important;
+  color:var(--text) !important;
+  border:1px solid var(--line) !important;
+}
+button{
+  background:#f3f4f6 !important;
+  border:1px solid #d1d5db !important;
+  color:var(--text) !important;
+}
+button:hover{filter:none !important; background:#e5e7eb !important;}
+button.primary{background:var(--blue) !important; color:#fff !important; border:none !important;}
+button.danger{background:var(--red) !important; color:#fff !important; border:none !important;}
+button.ghost{background:transparent !important;}
+table th{background:#f3f4f6 !important; color:#374151 !important;}
+tr:hover td{background:#f9fafb !important;}
+/* === TOP BAR (standalone + iframe) === */
+.wlpTopbar{
+  position:fixed; left:0; right:0; top:0; height:54px;
+  background:#ffffff; border-bottom:1px solid var(--line);
+  display:flex; align-items:center; gap:10px; padding:0 12px;
+  z-index:9999;
+}
+.wlpBrand{font-weight:900; letter-spacing:.2px;}
+.wlpNav{display:flex; gap:6px; flex-wrap:wrap; align-items:center}
+.wlpNav a, .wlpNav button{
+  text-decoration:none;
+  padding:8px 10px;
+  border-radius:10px;
+  border:1px solid #d1d5db;
+  background:#f9fafb;
+  color:#111827;
+  font-weight:800;
+  font-size:13px;
+  cursor:pointer;
+}
+.wlpNav a:hover, .wlpNav button:hover{background:#eef2ff; border-color:#c7d2fe;}
+.wlpTitlebar{
+  position:sticky; top:54px;
+  background:rgba(248,250,252,.92);
+  backdrop-filter:saturate(140%) blur(6px);
+  border-bottom:1px solid var(--line);
+  padding:10px 16px;
+  z-index:999;
+}
+.wlpTitlebar .t1{font-size:16px; font-weight:900; margin:0;}
+.wlpTitlebar .t2{font-size:12px; color:var(--muted); margin-top:4px;}
+.wlpBodyPad{padding-top:54px;}
+
+\1
 </head>
-<body>
+<body class="wlpBodyPad">
+
+<div class="wlpTopbar">
+  <div class="wlpBrand">WorkLog PRO</div>
+  <div class="wlpNav" role="navigation" aria-label="WorkLog PRO Navigation">
+    <a href="home.html" onclick="return navTo('home.html')">HOME</a>
+    <a href="worklog.html" onclick="return navTo('worklog.html')">업무일지</a>
+    <a href="materials.html" onclick="return navTo('materials.html')">자재일지</a>
+    <a href="items.html" onclick="return navTo('items.html')">항목관리</a>
+    <a href="schedule.html" onclick="return navTo('schedule.html')">일정표</a>
+    <a href="timeline.html" onclick="return navTo('timeline.html')">타임라인</a>
+  </div>
+</div>
+
+<div class="wlpTitlebar">
+  <div class="t1">타임라인</div>
+  <div class="t2">화이트 ERP 테마 · 상단 고정 네비 · 타이틀 바</div>
+</div>
+
 <div class="wrap">
   <div class="header">타임라인</div>
   <div class="small">시간 순서대로 중요한 일을 기록합니다. 리스트 항목을 클릭하면 입력창에 불러와서 수정할 수 있습니다.</div>
@@ -301,5 +382,19 @@ document.addEventListener('DOMContentLoaded', ()=>{
   render();
 });
 </script>
-</body>
+
+<script>
+function navTo(file){
+  try{
+    if(window.parent && window.parent !== window && typeof window.parent.go === 'function'){
+      window.parent.go(file);
+      return false;
+    }
+  }catch(e){}
+  window.location.href = file;
+  return false;
+}
+</script>
+
+\1
 </html>

@@ -29,7 +29,8 @@
     AUTO_BACKUPS: 'autoBackups_v1',
     LAST_GOOD: 'lastGoodSnapshot_v1'
     ,
-    HIDDEN_DEFAULTS: 'hiddenDefaults_v1'
+    HIDDEN_DEFAULTS: 'hiddenDefaults_v1',
+    HOLIDAYS: 'holidays_v1'
   });
 
   
@@ -108,6 +109,28 @@ APP.util = {
       return dt.getFullYear()+'-'+APP.util.pad2(dt.getMonth()+1)+'-'+APP.util.pad2(dt.getDate());
     },
     todayISO(){ return APP.util.ymd(new Date()); },
+    dowChar(dateStr){
+      const s = String(dateStr||'').slice(0,10);
+      const d = new Date(s+'T00:00:00');
+      const map = ['일','월','화','수','목','금','토'];
+      return map[d.getDay()];
+    },
+    isSaturday(dateStr){
+      const s = String(dateStr||'').slice(0,10);
+      const d = new Date(s+'T00:00:00');
+      return d.getDay()===6;
+    },
+    isSunday(dateStr){
+      const s = String(dateStr||'').slice(0,10);
+      const d = new Date(s+'T00:00:00');
+      return d.getDay()===0;
+    },
+    dateLabel(dateStr){
+      const s = String(dateStr||'').slice(0,10);
+      if(!/^\d{4}-\d{2}-\d{2}$/.test(s)) return String(dateStr||'');
+      return s + '(' + APP.util.dowChar(s) + ')';
+    },
+
     clampInt(v, def=0){
       const n = parseInt(v,10);
       return Number.isFinite(n) ? n : def;
@@ -175,7 +198,8 @@ APP.util = {
         K.WORKLOG, K.CATEGORIES, K.STATUSES, K.MATERIALS,
         K.MATERIAL_LOG, K.STOCK_BASE,
         K.SCHEDULE, K.TIMELINE,
-        K.CHANGELOG
+        K.CHANGELOG,
+        K.HOLIDAYS
       ];
       const data = {};
       keys.forEach(k => { data[k] = APP.store.getRaw(k); });
@@ -298,7 +322,28 @@ APP.util = {
       const cl = APP.store.getJSON(K.CHANGELOG, []);
       if(!Array.isArray(cl)) APP.store.setJSON(K.CHANGELOG, []);
 
-      // material log array
+      
+      // holidays array (objects: {date:'YYYY-MM-DD', name:'...'})
+      const hd = APP.store.getJSON(K.HOLIDAYS, []);
+      if(!Array.isArray(hd)) APP.store.setJSON(K.HOLIDAYS, []);
+      else{
+        // normalize objects
+        const cleaned = [];
+        const seen = new Set();
+        hd.forEach(x=>{
+          if(!x || typeof x!=='object') return;
+          const d = String(x.date||'').slice(0,10);
+          const n = String(x.name||'').trim();
+          if(!/^\d{4}-\d{2}-\d{2}$/.test(d) || !n) return;
+          const key = d + '||' + n;
+          if(seen.has(key)) return;
+          seen.add(key);
+          cleaned.push({date:d, name:n});
+        });
+        APP.store.setJSON(K.HOLIDAYS, cleaned);
+      }
+
+// material log array
       const ml = APP.store.getJSON(K.MATERIAL_LOG, []);
       if(!Array.isArray(ml)) APP.store.setJSON(K.MATERIAL_LOG, []);
 
@@ -344,7 +389,8 @@ APP.util = {
         APP.KEYS.WORKLOG, APP.KEYS.CATEGORIES, APP.KEYS.STATUSES, APP.KEYS.MATERIALS,
         APP.KEYS.MATERIAL_LOG, APP.KEYS.STOCK_BASE,
         APP.KEYS.SCHEDULE, APP.KEYS.TIMELINE,
-        APP.KEYS.CHANGELOG
+        APP.KEYS.CHANGELOG,
+        APP.KEYS.HOLIDAYS
       ];
       for(const k of keysToCheck){
         const raw = global.localStorage.getItem(k);
@@ -373,7 +419,45 @@ APP.util = {
   }
 
 
-  // ====== File-based DB (data.json) for Android-safe persistence ======
+  
+  // ====== Holidays (공휴일) ======
+  APP.holidays = (function(){
+    const KEY = APP.KEYS.HOLIDAYS || 'holidays_v1';
+
+    function list(){
+      APP.migrate && APP.migrate.run && APP.migrate.run();
+      const arr = APP.store.getJSON(KEY, []);
+      return Array.isArray(arr) ? arr : [];
+    }
+
+    function save(arr){
+      APP.store.setJSON(KEY, Array.isArray(arr) ? arr : []);
+      APP.log.add('HOLIDAY', '공휴일 목록 저장');
+      APP.backup.capture('holidays.save');
+    }
+
+    function map(){
+      const m = new Map();
+      list().forEach(x=>{
+        if(!x || !x.date) return;
+        m.set(String(x.date).slice(0,10), String(x.name||'').trim());
+      });
+      return m;
+    }
+
+    function name(dateStr){
+      const s = String(dateStr||'').slice(0,10);
+      return map().get(s) || '';
+    }
+
+    function isHoliday(dateStr){
+      return !!name(dateStr);
+    }
+
+    return Object.freeze({ KEY, list, save, map, name, isHoliday });
+  })();
+
+// ====== File-based DB (data.json) for Android-safe persistence ======
   // 어떤 화면에서든 APP.store로 저장이 발생하면 → data.json에 자동 저장
   // 앱 시작 시 저장된 파일 핸들이 있고 권한이 유지되면 → data.json을 읽어 localStorage 복원
   // 주의: 최초 1회 파일 선택/생성은 브라우저 보안상 "사용자 클릭"이 필요합니다.
@@ -483,7 +567,8 @@ APP.util = {
       if(!ok) return { ok:false, reason:'no-permission' };
       try{
         const w = await h.createWritable();
-        await w.write(JSON.stringify(obj, null, 2));
+        // 저장 용량 최소화(들여쓰기 제거)
+        await w.write(JSON.stringify(obj));
         await w.close();
         return { ok:true };
       }catch(e){
@@ -651,6 +736,44 @@ APP.util = {
       }
     }
 
+    // Many pages still call localStorage.setItem/removeItem directly.
+    // Hook them too so that ANY save triggers data.json update.
+    function hookLocalStorage(){
+      try{
+        const ls = window.localStorage;
+        if(!ls || ls.__fileDBHooked) return;
+
+        const _setItem = ls.setItem ? ls.setItem.bind(ls) : null;
+        const _removeItem = ls.removeItem ? ls.removeItem.bind(ls) : null;
+        const _clear = ls.clear ? ls.clear.bind(ls) : null;
+
+        if(_setItem){
+          ls.setItem = function(k,v){
+            const r = _setItem(k,v);
+            // Avoid infinite loops for internal lock/meta writes
+            if(isConnected() && k !== SAVE_LOCK_KEY && k !== META_KEY) scheduleSave();
+            return r;
+          };
+        }
+        if(_removeItem){
+          ls.removeItem = function(k){
+            const r = _removeItem(k);
+            if(isConnected() && k !== SAVE_LOCK_KEY && k !== META_KEY) scheduleSave();
+            return r;
+          };
+        }
+        if(_clear){
+          ls.clear = function(){
+            const r = _clear();
+            if(isConnected()) scheduleSave();
+            return r;
+          };
+        }
+
+        ls.__fileDBHooked = true;
+      }catch(_){/* ignore */}
+    }
+
     async function uiConnect(){
       const res = await connectExisting();
       if(res.ok){
@@ -675,6 +798,7 @@ APP.util = {
     (function init(){
       listen();
       hookStore();
+      hookLocalStorage();
       tryAutoConnect().then(r=>{ if(r.ok){ try{ window.dispatchEvent(new Event('wlp-filedb-restored')); }catch(_){}}});
     })();
 

@@ -46,9 +46,90 @@
   .sectionTitle{margin:10px 0 6px 0;color:var(--muted);font-size:12px;font-weight:900;display:flex;align-items:center;justify-content:space-between;gap:8px}
   .sectionTitle .right{display:flex;gap:8px;align-items:center}
 
-</style>
+
+/* === WHITE ERP THEME (global override) === */
+:root{
+  --bg:#f8fafc;
+  --panel:#ffffff;
+  --card:#ffffff;
+  --text:#111827;
+  --muted:#6b7280;
+  --line:#e5e7eb;
+  --blue:#2563eb;
+  --red:#ef4444;
+}
+body{background:var(--bg) !important; color:var(--text) !important;}
+.card{background:var(--card) !important; border:1px solid var(--line) !important;}
+input,select,textarea{
+  background:#ffffff !important;
+  color:var(--text) !important;
+  border:1px solid var(--line) !important;
+}
+button{
+  background:#f3f4f6 !important;
+  border:1px solid #d1d5db !important;
+  color:var(--text) !important;
+}
+button:hover{filter:none !important; background:#e5e7eb !important;}
+button.primary{background:var(--blue) !important; color:#fff !important; border:none !important;}
+button.danger{background:var(--red) !important; color:#fff !important; border:none !important;}
+button.ghost{background:transparent !important;}
+table th{background:#f3f4f6 !important; color:#374151 !important;}
+tr:hover td{background:#f9fafb !important;}
+/* === TOP BAR (standalone + iframe) === */
+.wlpTopbar{
+  position:fixed; left:0; right:0; top:0; height:54px;
+  background:#ffffff; border-bottom:1px solid var(--line);
+  display:flex; align-items:center; gap:10px; padding:0 12px;
+  z-index:9999;
+}
+.wlpBrand{font-weight:900; letter-spacing:.2px;}
+.wlpNav{display:flex; gap:6px; flex-wrap:wrap; align-items:center}
+.wlpNav a, .wlpNav button{
+  text-decoration:none;
+  padding:8px 10px;
+  border-radius:10px;
+  border:1px solid #d1d5db;
+  background:#f9fafb;
+  color:#111827;
+  font-weight:800;
+  font-size:13px;
+  cursor:pointer;
+}
+.wlpNav a:hover, .wlpNav button:hover{background:#eef2ff; border-color:#c7d2fe;}
+.wlpTitlebar{
+  position:sticky; top:54px;
+  background:rgba(248,250,252,.92);
+  backdrop-filter:saturate(140%) blur(6px);
+  border-bottom:1px solid var(--line);
+  padding:10px 16px;
+  z-index:999;
+}
+.wlpTitlebar .t1{font-size:16px; font-weight:900; margin:0;}
+.wlpTitlebar .t2{font-size:12px; color:var(--muted); margin-top:4px;}
+.wlpBodyPad{padding-top:54px;}
+
+\1
 </head>
-<body>
+<body class="wlpBodyPad">
+
+<div class="wlpTopbar">
+  <div class="wlpBrand">WorkLog PRO</div>
+  <div class="wlpNav" role="navigation" aria-label="WorkLog PRO Navigation">
+    <a href="home.html" onclick="return navTo('home.html')">HOME</a>
+    <a href="worklog.html" onclick="return navTo('worklog.html')">업무일지</a>
+    <a href="materials.html" onclick="return navTo('materials.html')">자재일지</a>
+    <a href="items.html" onclick="return navTo('items.html')">항목관리</a>
+    <a href="schedule.html" onclick="return navTo('schedule.html')">일정표</a>
+    <a href="timeline.html" onclick="return navTo('timeline.html')">타임라인</a>
+  </div>
+</div>
+
+<div class="wlpTitlebar">
+  <div class="t1">항목관리</div>
+  <div class="t2">화이트 ERP 테마 · 상단 고정 네비 · 타이틀 바</div>
+</div>
+
 <div class="wrap">
   <div class="header">
     <div>
@@ -62,10 +143,12 @@
     <button class="tab active" data-tab="categories" onclick="switchTab('categories',this)">구분</button>
     <button class="tab" data-tab="statuses" onclick="switchTab('statuses',this)">진행상황</button>
     <button class="tab" data-tab="materials" onclick="switchTab('materials',this)">자재</button>
+    <button class="tab" data-tab="holidays" onclick="switchTab('holidays',this)">공휴일</button>
   </div>
 
   <div class="card">
     <div class="row">
+      <input id="holidayDate" type="date" style="display:none;min-width:170px;background:#fff;color:#111;border:1px solid #cfd6e0;border-radius:10px;padding:10px 10px;font-size:14px"/>
       <input id="newItem" type="text" placeholder="추가할 항목 입력"/>
       <button class="primary" onclick="addItem()">추가</button>
       <button class="primary" id="btnUpdate" onclick="updateItem()" disabled>수정</button>
@@ -102,11 +185,13 @@
   const KEY_CATEGORIES = K.CATEGORIES;
   const KEY_STATUSES = K.STATUSES;
   const KEY_MATERIALS = K.MATERIALS;
+  const KEY_HOLIDAYS = K.HOLIDAYS || 'holidays_v1';
   const KEY_HIDDEN = 'hiddenDefaults_v1'; // 유지
 
   const DEFAULTS = {
     categories: ['전기','설비','특기사항','비고'],
     statuses: ['처리완료','진행중','보류','외주','미기록'],
+    holidays: [],
     materials: ['센서등','차동식감지기','연기감지기','정온식감지기','감압밸브','가로등램프','LED10W','아답터','도어클로저']
   };
 
@@ -182,7 +267,31 @@
     }
   }
 
-  function updateItem(){
+  function updateHoliday(){
+    if(!editOld || !editOld.date) return;
+    const dIn = document.getElementById('holidayDate');
+    const input = document.getElementById('newItem');
+    const date = String(dIn && dIn.value ? dIn.value : '').slice(0,10);
+    const name = String(input.value||'').trim();
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(date) || !name){
+      alert('공휴일은 날짜와 이름을 입력해야 합니다.');
+      return;
+    }
+    let list = getHolidayList();
+    // remove old date
+    list = list.filter(x=>x.date !== editOld.date);
+    // upsert new
+    const idx = list.findIndex(x=>x.date===date);
+    if(idx>=0) list[idx].name = name; else list.push({date, name});
+    setHolidayList(list);
+    input.value='';
+    if(dIn) dIn.value='';
+    clearEdit();
+    render();
+  }
+
+function updateItem(){
+    if(tab==='holidays') return updateHoliday();
     const input = document.getElementById('newItem');
     const next = (input.value||'').trim();
     if(!editOld) return alert('수정할 항목을 먼저 클릭하세요.');
@@ -238,10 +347,57 @@
   function getKeyByTab(t){
     if(t==='categories') return KEY_CATEGORIES;
     if(t==='statuses') return KEY_STATUSES;
-    return KEY_MATERIALS;
+    if(t==='materials') return KEY_MATERIALS;
+    return KEY_HOLIDAYS;
   }
 
-  function getList(t){
+  
+  function normalizeHolidayList(arr){
+    const out = [];
+    const seen = new Set();
+    (Array.isArray(arr)?arr:[]).forEach(x=>{
+      if(!x || typeof x!=='object') return;
+      const d = String(x.date||'').slice(0,10);
+      const n = String(x.name||'').trim();
+      if(!/^\d{4}-\d{2}-\d{2}$/.test(d) || !n) return;
+      if(seen.has(d)) return;
+      seen.add(d);
+      out.push({date:d, name:n});
+    });
+    out.sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+    return out;
+  }
+
+  function getHolidayList(){
+    window.APP.migrate.run();
+    const arr = safeParse(localStorage.getItem(KEY_HOLIDAYS), []);
+    return normalizeHolidayList(arr);
+  }
+  function setHolidayList(arr){
+    localStorage.setItem(KEY_HOLIDAYS, JSON.stringify(normalizeHolidayList(arr)));
+    window.APP.backup && APP.backup.capture && APP.backup.capture('holidays.edit');
+    window.APP.log && APP.log.add && APP.log.add('HOLIDAY','공휴일 변경');
+  }
+
+  function beginEditHolidayByDate(ds){
+    const d = String(ds||'').slice(0,10);
+    const list = getHolidayList();
+    const h = list.find(x=>x.date===d);
+    if(h) beginEditHoliday(h);
+  }
+
+function beginEditHoliday(h){
+    const dIn = document.getElementById('holidayDate');
+    const input = document.getElementById('newItem');
+    if(dIn){ dIn.style.display='block'; dIn.value = h.date || ''; }
+    input.value = h.name || '';
+    editOld = { date: h.date, name: h.name };
+    const btn = document.getElementById('btnUpdate');
+    if(btn){ btn.disabled = false; }
+    input.focus();
+  }
+
+function getList(t){
     window.APP.migrate.run();
     const key = getKeyByTab(t);
     const arr = safeParse(localStorage.getItem(key), []);
@@ -256,7 +412,8 @@
   function hintFor(t){
     if(t==='categories') return '업무일지의 "구분" 드롭다운에 연동됩니다.';
     if(t==='statuses') return '업무일지의 "진행상황" 드롭다운에 연동됩니다.';
-    return '업무일지의 "자재" 목록 및 자재일지 재고 계산에 사용됩니다.';
+    if(t==='materials') return '업무일지의 "자재" 목록 및 자재일지 재고 계산에 사용됩니다.';
+    return '홈 달력/모든 화면의 날짜 색상에 즉시 적용됩니다.';
   }
 
   function switchTab(next, btn){
@@ -264,11 +421,44 @@
     document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));
     btn.classList.add('active');
     document.getElementById('newItem').value='';
+    const dIn = document.getElementById('holidayDate');
+    const btnReset = document.querySelector('button.mini[onclick="resetToDefaults()"]');
+    const btnHidden = document.querySelector('button.mini.danger[onclick="clearHidden()"]');
+    if(dIn){ dIn.style.display = (tab==='holidays') ? 'block' : 'none'; dIn.value=''; }
+    if(btnReset) btnReset.style.display = (tab==='holidays') ? 'none' : 'inline-block';
+    if(btnHidden) btnHidden.style.display = (tab==='holidays') ? 'none' : 'inline-block';
+    const inp = document.getElementById('newItem');
+    if(inp) inp.placeholder = (tab==='holidays') ? '공휴일 이름 입력' : '추가할 항목 입력';
+
     clearEdit();
     render();
   }
 
-  function addItem(){
+  function addHoliday(){
+    const dIn = document.getElementById('holidayDate');
+    const input = document.getElementById('newItem');
+    const date = String(dIn && dIn.value ? dIn.value : '').slice(0,10);
+    const name = String(input.value||'').trim();
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(date) || !name){
+      alert('공휴일은 날짜와 이름을 입력해야 합니다.');
+      return;
+    }
+    const list = getHolidayList();
+    const idx = list.findIndex(x=>x.date===date);
+    if(idx>=0){
+      list[idx].name = name;
+    }else{
+      list.push({date, name});
+    }
+    setHolidayList(list);
+    input.value='';
+    if(dIn) dIn.value='';
+    clearEdit();
+    render();
+  }
+
+function addItem(){
+    if(tab==='holidays') return addHoliday();
     const input = document.getElementById('newItem');
     const v = (input.value||'').trim();
     if(!v) return;
@@ -479,5 +669,19 @@
   window.APP.migrate.run();
   render();
 </script>
-</body>
+
+<script>
+function navTo(file){
+  try{
+    if(window.parent && window.parent !== window && typeof window.parent.go === 'function'){
+      window.parent.go(file);
+      return false;
+    }
+  }catch(e){}
+  window.location.href = file;
+  return false;
+}
+</script>
+
+\1
 </html>
