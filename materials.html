@@ -1,0 +1,556 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>자재일지</title>
+<style>
+  :root{
+    --bg:#0f172a; --card:#111c33; --text:#e5e7eb; --muted:#9ca3af;
+    --line:rgba(255,255,255,.10); --btn:#1f2937; --btn2:#0b1224;
+    --good:#10b981; --warn:#f59e0b; --bad:#ef4444;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text)}
+  .wrap{max-width:1200px;margin:0 auto;padding:16px}
+  .header{display:flex;align-items:end;justify-content:space-between;gap:12px;margin-bottom:12px;flex-wrap:wrap}
+  h1{margin:0;font-size:20px}
+  .hint{color:var(--muted);font-size:12px;line-height:1.4}
+  .grid{display:grid;grid-template-columns: 1fr 1fr; gap:12px}
+  @media(max-width:980px){.grid{grid-template-columns:1fr}}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px}
+  .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  input,select,textarea,button{font:inherit}
+  input,select,textarea{
+    background:#fff;color:#111;border:1px solid #cfd6e0;border-radius:10px;
+    padding:10px 10px;font-size:14px;
+  }
+  textarea{width:100%;min-height:84px;resize:vertical}
+  button{background:var(--btn);border:1px solid var(--line);color:var(--text);padding:10px 12px;border-radius:10px;cursor:pointer;font-size:14px;font-weight:900}
+  button:hover{filter:brightness(1.06)}
+  button.primary{background:var(--btn2);border-color:rgba(37,99,235,.35)}
+  button.danger{background:rgba(185,28,28,.45);border-color:rgba(185,28,28,.65)}
+  button.mini{padding:6px 10px;font-size:13px}
+  table{width:100%;border-collapse:collapse;margin-top:10px;font-size:13px}
+  th,td{border-bottom:1px solid rgba(255,255,255,.10);padding:10px 8px;vertical-align:middle}
+  th{color:rgba(229,231,235,.85);font-size:12px;text-align:center;white-space:nowrap;font-weight:900}
+  td{text-align:center}
+  td.left{text-align:left}
+  tr:hover td{background:rgba(255,255,255,.03)}
+  .pill{display:inline-block;padding:2px 8px;border:1px solid rgba(255,255,255,.12);border-radius:999px;font-size:12px;color:rgba(229,231,235,.92)}
+  .pill.good{border-color:rgba(16,185,129,.35);color:rgba(167,243,208,.95)}
+  .pill.warn{border-color:rgba(245,158,11,.35);color:rgba(253,230,138,.95)}
+  .pill.bad{border-color:rgba(239,68,68,.35);color:rgba(254,202,202,.95)}
+  .hr{height:1px;background:rgba(255,255,255,.08);margin:12px 0}
+
+  .deleted{ text-decoration: line-through; opacity: .55; }
+
+  .pager{display:flex; align-items:center; justify-content:center; gap:10px; margin-top:10px}
+  .pager .mini{padding:6px 10px}
+  .pager .info{color:rgba(229,231,235,.85); font-size:13px}
+  .pager select{background:var(--btn2); color:var(--text); border:1px solid var(--line); border-radius:10px; padding:6px 10px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="header">
+    <div>
+      <h1>자재일지</h1>
+      <div class="hint">업무일지에서 자재+갯수(1 이상) 입력 시 자동 연동됩니다. 여기서는 수동 사용기록과 초기재고를 관리합니다.</div>
+    </div>
+    <div class="row">
+      <button class="mini" onclick="downloadAll()">전체 백업</button>
+      <input id="restoreAllFile" type="file" accept="application/json"/>
+      <button class="mini danger" onclick="restoreAll()">전체 복원</button>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <div style="font-weight:1000">수동 사용기록</div>
+      <div class="hint">수동으로 자재 사용을 기록합니다. (업무일지 연동 기록은 여기서 삭제할 수 없습니다)</div>
+
+      <div class="row" style="margin-top:10px">
+        <div style="flex:1;min-width:160px">
+          날짜<br/>
+          <input id="logDate" type="date"/>
+        </div>
+        <div style="flex:1;min-width:160px">
+          자재<br/>
+          <select id="matSel" style="width:100%"></select>
+        </div>
+        <div style="width:120px">
+          수량<br/>
+          <input id="qty" type="number" min="1" value="1"/>
+        </div>
+      </div>
+      <div style="margin-top:10px">
+        비고
+        <textarea id="note" placeholder="예) 7동 708호 교체"></textarea>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <button class="primary" onclick="addManual()">저장</button>
+        <button class="danger" onclick="purgeManual()">수동기록 전체삭제</button>
+      </div>
+
+      <div class="hr"></div>
+      <div style="font-weight:1000">초기 재고 설정</div>
+      <div class="hint">자재별 초기 재고를 입력하면 잔여가 계산됩니다.</div>
+
+      <div class="row" style="margin-top:10px">
+        <select id="baseMat" style="flex:1;min-width:160px"></select>
+        <input id="baseQty" type="number" min="0" value="0" style="width:120px"/>
+        <button class="mini primary" onclick="setBase()">설정</button>
+        <button class="mini danger" onclick="clearBase()">삭제</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="row" style="justify-content:space-between">
+        <div>
+          <div style="font-weight:1000">재고 요약</div>
+          <div class="hint">초기 - 사용 = 잔여 (업무일지 연동 포함)</div>
+        </div>
+        <div class="row">
+          <label class="hint">경고 기준</label>
+          <input id="warnTh" type="number" min="0" value="5" style="width:90px"/>
+          <button class="mini" onclick="renderAll()">적용</button>
+        </div>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th style="text-align:left">자재</th>
+            <th>초기</th>
+            <th>사용</th>
+            <th>잔여</th>
+            <th>상태</th>
+          </tr>
+        </thead>
+        <tbody id="stockBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:12px">
+    <div class="row" style="justify-content:space-between;gap:10px;flex-wrap:wrap">
+      <div>
+        <div style="font-weight:1000">사용 기록</div>
+        <div class="hint">업무일지 연동(source=worklog) + 수동(source=manual)</div>
+      </div>
+      <div class="row">
+        <select id="srcFilter" onchange="onLogFilterChange()">
+          <option value="all">전체</option>
+          <option value="worklog">업무일지 연동</option>
+          <option value="manual">수동</option>
+        </select>
+        <select id="matFilter" onchange="onLogFilterChange()">
+          <option value="all">자재 전체</option>
+        </select>
+        <input id="q" type="text" placeholder="검색어(자재/비고)" oninput="onLogFilterChange()" style="min-width:220px"/>
+
+        <label style="display:flex;align-items:center;gap:8px">
+          <span class="hint">표시</span>
+          <select id="logPageSize" onchange="onLogPageSizeChange()">
+            <option value="10">10개</option>
+            <option value="20">20개</option>
+            <option value="30">30개</option>
+            <option value="50">50개</option>
+            <option value="100">100개</option>
+          </select>
+        </label>
+
+      </div>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th style="width:120px">날짜</th>
+          <th style="width:110px">출처</th>
+          <th style="text-align:left">자재</th>
+          <th style="width:90px">수량</th>
+          <th style="text-align:left">비고</th>
+          <th style="width:90px">삭제</th>
+        </tr>
+      </thead>
+      <tbody id="logBody"></tbody>
+    </table>
+
+    <div class="pager" id="logPager">
+      <button class="mini" id="logPrevBtn" type="button" onclick="logPrev()">이전</button>
+      <span class="info" id="logPageInfo">1 / 1</span>
+      <button class="mini" id="logNextBtn" type="button" onclick="logNext()">다음</button>
+    </div>
+
+  </div>
+</div>
+
+<script src="app_core.js"></script>
+<script>
+  const K = window.APP.KEYS;
+  const KEY_MATERIALS = K.MATERIALS;
+  const KEY_LOG = K.MATERIAL_LOG;
+
+  // 사용기록 페이지
+  let logPage = 1;
+  let logPageSize = 10;
+  const KEY_LOG_PAGE_SIZE = 'WLP_MATERIAL_LOG_PAGE_SIZE';
+  const KEY_BASE = K.STOCK_BASE;
+
+  function safeParse(str, fallback){ return window.APP.util.safeParseJSON(str, fallback); }
+  function esc(s){ return window.APP.util.escapeHtml(s); }
+function dateClass(d){
+  const ds=String(d||'').slice(0,10);
+  const hol=(window.APP.holidays&&APP.holidays.isHoliday)?APP.holidays.isHoliday(ds):false;
+  if(hol) return 'dateHol';
+  if(window.APP.util.isSunday(ds)) return 'dateSun';
+  if(window.APP.util.isSaturday(ds)) return 'dateSat';
+  return '';
+}
+function dateLabelWithHoliday(d){
+  const ds=String(d||'').slice(0,10);
+  const base=window.APP.util.dateLabel(ds);
+  const hn=(window.APP.holidays&&APP.holidays.name)?APP.holidays.name(ds):'';
+  return hn?(base+' '+hn):base;
+}
+function renderDate(d){
+  const ds=String(d||'').slice(0,10);
+  return `<span class=\"dateTag ${dateClass(ds)}\">${esc(dateLabelWithHoliday(ds))}</span>`;
+}
+  function today(){ return window.APP.util.todayISO(); }
+
+  function getMaterials(){
+    window.APP.migrate.run();
+    const arr = safeParse(localStorage.getItem(KEY_MATERIALS), []);
+    return Array.isArray(arr) ? arr : [];
+  }
+
+  function loadSelects(){
+    const mats = getMaterials();
+    const sel1 = document.getElementById('matSel');
+    const sel2 = document.getElementById('baseMat');
+    const selF = document.getElementById('matFilter');
+    const prevF = selF ? selF.value : 'all';
+    sel1.innerHTML='';
+    sel2.innerHTML='';
+    if(selF) selF.innerHTML='';
+
+    const ph1=document.createElement('option'); ph1.value=''; ph1.textContent='select';
+    sel1.appendChild(ph1);
+    mats.forEach(m=>{ const o=document.createElement('option'); o.value=m; o.textContent=m; sel1.appendChild(o); });
+
+    const ph2=document.createElement('option'); ph2.value=''; ph2.textContent='select';
+    sel2.appendChild(ph2);
+    mats.forEach(m=>{ const o=document.createElement('option'); o.value=m; o.textContent=m; sel2.appendChild(o); });
+
+    // log filter select (자재별 검색)
+    if(selF){
+      const a=document.createElement('option'); a.value='all'; a.textContent='자재 전체';
+      selF.appendChild(a);
+      mats.forEach(m=>{ const o=document.createElement('option'); o.value=m; o.textContent=m; selF.appendChild(o); });
+      // restore previous selection if possible
+      if([...selF.options].some(x=>x.value===prevF)) selF.value=prevF;
+    }
+  }
+
+  function getLog(){
+    const arr = safeParse(localStorage.getItem(KEY_LOG), []);
+    return Array.isArray(arr) ? arr : [];
+  }
+  function setLog(arr){
+    localStorage.setItem(KEY_LOG, JSON.stringify(arr));
+    window.APP.backup.capture('materials.log');
+  }
+
+  function getBase(){
+    const obj = safeParse(localStorage.getItem(KEY_BASE), {});
+    return (obj && typeof obj === 'object' && !Array.isArray(obj)) ? obj : {};
+  }
+  function setBaseObj(obj){
+    localStorage.setItem(KEY_BASE, JSON.stringify(obj));
+    window.APP.backup.capture('materials.base');
+  }
+
+  function addManual(){
+    const date = document.getElementById('logDate').value;
+    const mat = document.getElementById('matSel').value;
+    const qty = parseInt(document.getElementById('qty').value||'0',10) || 0;
+    const note = document.getElementById('note').value.trim();
+    if(!date || !mat || qty<=0) return alert('날짜/자재/수량을 확인');
+
+    const id = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now())+Math.random());
+    const db = getLog();
+    db.push({id, source:'manual', date, material:mat, qty, note, updatedAt:Date.now()});
+    setLog(db);
+    window.APP.log.add('MATERIAL', `수동 사용기록: ${date} / ${mat} x${qty}`);
+
+    document.getElementById('matSel').value='';
+    document.getElementById('qty').value='1';
+    document.getElementById('note').value='';
+    renderAll();
+  }
+
+  function purgeManual(){
+    if(!confirm('수동기록만 전체 삭제할까요?')) return;
+    const db = getLog().filter(x=>x && x.source==='worklog');
+    setLog(db);
+    window.APP.log.add('MATERIAL', '수동기록 전체 삭제');
+    renderAll();
+  }
+
+  function deleteManual(id){
+    if(!confirm('삭제할까요?')) return;
+    const db = getLog();
+    const it = db.find(x=>x.id===id);
+    if(!it || it.source!=='manual') return alert('업무일지 연동 기록은 삭제할 수 없습니다.');
+    setLog(db.filter(x=>x.id!==id));
+    window.APP.log.add('MATERIAL', `수동기록 삭제: ${it.date} / ${it.material} x${it.qty}`);
+    renderAll();
+  }
+
+  function setBase(){
+    const mat = document.getElementById('baseMat').value;
+    const qty = parseInt(document.getElementById('baseQty').value||'0',10) || 0;
+    if(!mat) return;
+    const base = getBase();
+    base[mat] = qty;
+    setBaseObj(base);
+    window.APP.log.add('MATERIAL', `초기재고 설정: ${mat} = ${qty}`);
+    renderAll();
+  }
+
+  function clearBase(){
+    const mat = document.getElementById('baseMat').value;
+    if(!mat) return;
+    const base = getBase();
+    if(!(mat in base)) return;
+    if(!confirm('삭제할까요?')) return;
+    delete base[mat];
+    setBaseObj(base);
+    window.APP.log.add('MATERIAL', `초기재고 삭제: ${mat}`);
+    renderAll();
+  }
+
+  function computeUsedMap(){
+    const used = {};
+    getLog().forEach(x=>{
+      if(!x || !x.material) return;
+      const m = String(x.material);
+      const q = parseInt(x.qty||0,10) || 0;
+      used[m] = (used[m]||0) + q;
+    });
+    return used;
+  }
+
+  function stockStatus(rem, warn){
+    if(rem <= 0) return {cls:'bad', txt:'부족'};
+    if(rem <= warn) return {cls:'warn', txt:'주의'};
+    return {cls:'good', txt:'양호'};
+  }
+
+  function renderStock(){
+    const mats = getMaterials();
+    const base = getBase();
+    const usedMap = computeUsedMap();
+    const warn = parseInt(document.getElementById('warnTh').value||'0',10) || 0;
+
+    const rows = mats.map(m=>{
+      const init = parseInt(base[m]||0,10) || 0;
+      const used = parseInt(usedMap[m]||0,10) || 0;
+      const rem = init - used;
+      const st = stockStatus(rem, warn);
+      return {m, init, used, rem, st};
+    });
+
+    // 잔여 적은 순
+    rows.sort((a,b)=>a.rem-b.rem);
+
+    const body = document.getElementById('stockBody');
+    body.innerHTML='';
+    if(rows.length===0){
+      body.innerHTML = '<tr><td colspan="5" class="left" style="color:rgba(229,231,235,.7)">자재 목록이 없습니다. (항목관리에서 자재를 추가하세요)</td></tr>';
+      return;
+    }
+
+    rows.forEach(r=>{
+      const tr=document.createElement('tr');
+      tr.innerHTML = `
+        <td class="left">${esc(r.m)}</td>
+        <td>${r.init}</td>
+        <td>${r.used}</td>
+        <td>${r.rem}</td>
+        <td><span class="pill ${r.st.cls}">${r.st.txt}</span></td>
+      `;
+      body.appendChild(tr);
+    });
+  }
+
+  function renderLogs(){
+    const src = document.getElementById('srcFilter').value;
+    const mat = document.getElementById('matFilter') ? document.getElementById('matFilter').value : 'all';
+    const q = (document.getElementById('q').value||'').trim().toLowerCase();
+
+    let rows = getLog().slice();
+    if(src !== 'all') rows = rows.filter(x=>x && x.source===src);
+    if(mat !== 'all') rows = rows.filter(x=> (x && String(x.material||'') === String(mat)));
+    if(q) rows = rows.filter(x=>{
+      const s = `${x.material||''} ${x.note||''}`.toLowerCase();
+      return s.includes(q);
+    });
+
+    // newest first
+    rows.sort((a,b)=> (b.date+a.id).localeCompare(a.date+b.id));
+
+    // pagination (최근 N개 선택 + 페이지 넘김)
+    const total = rows.length;
+    const size = Math.max(1, parseInt(logPageSize,10)||10);
+    const totalPages = Math.max(1, Math.ceil(total / size));
+    if(logPage > totalPages) logPage = totalPages;
+    if(logPage < 1) logPage = 1;
+
+    const startIdx = (logPage-1)*size;
+    const endIdx = startIdx + size;
+    const pageRows = rows.slice(startIdx, endIdx);
+
+    updateLogPager(totalPages, total);
+
+
+    const body = document.getElementById('logBody');
+    body.innerHTML='';
+    if(rows.length===0){
+      body.innerHTML = '<tr><td colspan="6" class="left" style="color:rgba(229,231,235,.7)">표시할 기록이 없습니다.</td></tr>';
+      return;
+    }
+
+    pageRows.forEach(x=>{
+      const tr=document.createElement('tr');
+      const srcName = x.source==='worklog' ? '업무일지' : '수동';
+      const canDel = x.source==='manual';
+      tr.innerHTML = `
+        <td>${esc(x.date||'')}</td>
+        <td>${esc(srcName)}</td>
+        <td class="left">${esc(x.material||'')}</td>
+        <td>${parseInt(x.qty||0,10)||0}</td>
+        <td class="left">${esc(x.note||x.note===0?String(x.note):'')}</td>
+        <td>${canDel ? `<button class="mini danger" data-del="${esc(x.id)}">삭제</button>` : '<span class="hint">-</span>'}</td>
+      `;
+      if(canDel){
+        tr.querySelector('button[data-del]').addEventListener('click', ()=>deleteManual(x.id));
+      }
+      body.appendChild(tr);
+    });
+  }
+
+
+  function onLogFilterChange(){
+    logPage = 1;
+    renderAll();
+  }
+
+  function onLogPageSizeChange(){
+    const sel = document.getElementById('logPageSize');
+    logPageSize = parseInt(sel.value,10)||10;
+    localStorage.setItem(KEY_LOG_PAGE_SIZE, String(logPageSize));
+    logPage = 1;
+    renderAll();
+  }
+
+  function logPrev(){
+    if(logPage>1){ logPage--; renderAll(); }
+  }
+  function logNext(){
+    const info = document.getElementById('logPager');
+    // totalPages는 updateLogPager에서 dataset에 저장
+    const totalPages = parseInt(info?.dataset?.pages||'1',10)||1;
+    if(logPage<totalPages){ logPage++; renderAll(); }
+  }
+
+  function updateLogPager(totalPages, total){
+    const pager = document.getElementById('logPager');
+    const info = document.getElementById('logPageInfo');
+    const prev = document.getElementById('logPrevBtn');
+    const next = document.getElementById('logNextBtn');
+    if(!pager || !info || !prev || !next) return;
+
+    pager.dataset.pages = String(totalPages);
+    info.textContent = `${logPage} / ${totalPages} (총 ${total}건)`;
+    prev.disabled = (logPage<=1);
+    next.disabled = (logPage>=totalPages);
+    prev.style.opacity = prev.disabled ? .4 : 1;
+    next.style.opacity = next.disabled ? .4 : 1;
+  }
+
+
+  function renderAll(){
+    renderStock();
+    renderLogs();
+  }
+
+  function downloadJson(filename, obj){
+    const blob = new Blob([JSON.stringify(obj, null, 2)], {type:'application/json'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(a.href);
+  }
+
+  function downloadAll(){
+    const obj = {
+      meta:{app:'WorkLogPRO',schema:window.APP.SCHEMA_VERSION,createdAt:new Date().toISOString()},
+      stockBase: getBase(),
+      materialLog: getLog()
+    };
+    downloadJson(`materials_${window.APP.util.stamp()}.json`, obj);
+    window.APP.log.add('BACKUP', '자재일지 전체 백업 다운로드');
+  }
+
+  function restoreAll(){
+    const file = document.getElementById('restoreAllFile').files[0];
+    if(!file) return alert('복원 파일을 선택해 주세요.');
+    const r = new FileReader();
+    r.onload = ()=>{
+      try{
+        const obj = JSON.parse(String(r.result||''));
+        const base = obj.stockBase;
+        const log = obj.materialLog;
+        if(!base || typeof base !== 'object' || Array.isArray(base)) return alert('파일 형식 오류(초기재고)');
+        if(!Array.isArray(log)) return alert('파일 형식 오류(사용기록)');
+        if(!confirm('자재일지 데이터가 덮어써집니다. 복원할까요?')) return;
+        setBaseObj(base);
+        setLog(log);
+        window.APP.migrate.run();
+        window.APP.log.add('BACKUP', '자재일지 전체 복원 완료');
+        renderAll();
+      }catch(e){
+        alert('복원 실패: 파일을 읽을 수 없습니다.');
+      }
+    };
+    r.readAsText(file, 'utf-8');
+  }
+
+  // init
+  document.addEventListener('DOMContentLoaded', ()=>{
+    window.APP.migrate.run();
+    document.getElementById('logDate').value = today();
+    loadSelects();
+
+    // 사용기록 표시 개수(10/20/30/50/100) 불러오기
+    const savedSize = parseInt(localStorage.getItem(KEY_LOG_PAGE_SIZE)||'10',10);
+    logPageSize = [10,20,30,50,100].includes(savedSize) ? savedSize : 10;
+    const sizeSel = document.getElementById('logPageSize');
+    if(sizeSel) sizeSel.value = String(logPageSize);
+
+    renderAll();
+
+    window.addEventListener('storage', (e)=>{
+      if(e.key===KEY_MATERIALS) loadSelects();
+      if(e.key===KEY_LOG || e.key===KEY_BASE) renderAll();
+    });
+  });
+</script>
+</body>
+</html>

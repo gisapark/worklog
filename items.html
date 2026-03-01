@@ -1,0 +1,592 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>항목관리</title>
+<style>
+  :root{
+    --bg:#0f172a; --card:#111c33; --text:#e5e7eb; --muted:#9ca3af;
+    --line:rgba(255,255,255,.10); --btn:#1f2937; --btn2:#0b1224; --accent:#2563eb;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text)}
+  .wrap{max-width:980px;margin:0 auto;padding:16px}
+  .header{display:flex;align-items:end;justify-content:space-between;gap:12px;margin-bottom:12px}
+  h1{margin:0;font-size:20px}
+  .hint{color:var(--muted);font-size:12px;line-height:1.4}
+  .tabs{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}
+  .tab{background:var(--btn);border:1px solid var(--line);color:var(--text);padding:8px 10px;border-radius:10px;cursor:pointer;font-size:14px;font-weight:900}
+  .tab.active{border-color:rgba(37,99,235,.6);box-shadow:0 0 0 2px rgba(37,99,235,.15) inset}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px}
+  .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  input[type="text"]{
+    flex:1;min-width:220px;
+    background:#fff;color:#111;border:1px solid #cfd6e0;border-radius:10px;
+    padding:10px 10px;font-size:14px;
+  }
+  button{
+    background:var(--btn);border:1px solid var(--line);color:var(--text);
+    padding:10px 12px;border-radius:10px;cursor:pointer;font-size:14px;font-weight:900
+  }
+  button:hover{filter:brightness(1.06)}
+  button.primary{background:var(--btn2);border-color:rgba(37,99,235,.35)}
+  button.danger{background:rgba(185,28,28,.45);border-color:rgba(185,28,28,.65)}
+  .mini{padding:6px 10px;font-size:13px}
+  .list{margin-top:12px;border-top:1px solid var(--line)}
+  .item{display:grid;grid-template-columns: 1fr 78px;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.08);}
+  .name{font-weight:900}
+  .badge{font-size:12px;color:var(--muted)}
+  .foot{margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .hr{height:1px;background:rgba(255,255,255,.08);margin:12px 0}
+
+  .badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:900;border:1px solid var(--line);color:var(--muted);margin-left:8px}
+  .item.hidden{opacity:.85}
+  .item.hidden .name{text-decoration:line-through;color:#cbd5e1}
+  .sectionTitle{margin:10px 0 6px 0;color:var(--muted);font-size:12px;font-weight:900;display:flex;align-items:center;justify-content:space-between;gap:8px}
+  .sectionTitle .right{display:flex;gap:8px;align-items:center}
+
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="header">
+    <div>
+      <h1>항목관리</h1>
+      <div class="hint">구분 / 진행상황 / 자재 항목을 관리합니다. 기본항목은 삭제되지 않고 숨김 처리됩니다.</div>
+    </div>
+    <div class="hint" id="countHint"></div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" data-tab="categories" onclick="switchTab('categories',this)">구분</button>
+    <button class="tab" data-tab="statuses" onclick="switchTab('statuses',this)">진행상황</button>
+    <button class="tab" data-tab="materials" onclick="switchTab('materials',this)">자재</button>
+    <button class="tab" data-tab="holidays" onclick="switchTab('holidays',this)">공휴일</button>
+  </div>
+
+  <div class="card">
+    <div class="row">
+      <input id="holidayDate" type="date" style="display:none;min-width:170px;background:#fff;color:#111;border:1px solid #cfd6e0;border-radius:10px;padding:10px 10px;font-size:14px"/>
+      <input id="newItem" type="text" placeholder="추가할 항목 입력"/>
+      <button class="primary" onclick="addItem()">추가</button>
+      <button class="primary" id="btnUpdate" onclick="updateItem()" disabled>수정</button>
+      <button class="mini" onclick="resetToDefaults()">기본값 복원</button>
+      <button class="mini danger" onclick="clearHidden()">숨김 초기화</button>
+    </div>
+
+    <div class="hr"></div>
+
+    <div class="hint" id="tabHint"></div>
+    <div class="list" id="list"></div>
+
+    <div class="sectionTitle" id="hiddenTitle" style="display:none">
+      <div>숨김 항목</div>
+      <div class="right">
+        <span class="hint" id="hiddenHint"></span>
+        <button class="mini" id="btnToggleHidden" onclick="toggleHidden()">보기</button>
+      </div>
+    </div>
+    <div class="list" id="hiddenList" style="display:none"></div>
+
+
+    <div class="foot">
+      <button class="mini" onclick="backupTab()">현재 탭 백업</button>
+      <input id="restoreFile" type="file" accept="application/json"/>
+      <button class="mini danger" onclick="restoreTab()">현재 탭 복원(덮어쓰기)</button>
+    </div>
+  </div>
+</div>
+
+<script src="app_core.js"></script>
+<script>
+  const K = window.APP.KEYS;
+  const KEY_CATEGORIES = K.CATEGORIES;
+  const KEY_STATUSES = K.STATUSES;
+  const KEY_MATERIALS = K.MATERIALS;
+  const KEY_HOLIDAYS = K.HOLIDAYS || 'holidays_v1';
+  const KEY_HIDDEN = 'hiddenDefaults_v1'; // 유지
+
+  const DEFAULTS = {
+    categories: ['전기','설비','특기사항','비고'],
+    statuses: ['처리완료','진행중','보류','외주','미기록'],
+    holidays: [],
+    materials: ['센서등','차동식감지기','연기감지기','정온식감지기','감압밸브','가로등램프','LED10W','아답터','도어클로저']
+  };
+
+  let tab = 'categories';
+
+  let editOld = null;
+
+  function beginEdit(name){
+    const input = document.getElementById('newItem');
+    input.value = name;
+    editOld = name;
+    const btn = document.getElementById('btnUpdate');
+    if(btn){ btn.disabled = false; }
+    input.focus();
+  }
+
+  function clearEdit(){
+    editOld = null;
+    const btn = document.getElementById('btnUpdate');
+    if(btn){ btn.disabled = true; }
+  }
+
+  function propagateRename(tabName, oldName, newName){
+    const K = window.APP.KEYS;
+    const KEY_WORKLOG = K.WORKLOG;
+    const KEY_LOG = K.MATERIAL_LOG;
+    const KEY_BASE = K.STOCK_BASE;
+
+    function sp(str, fb){ return window.APP.util.safeParseJSON(str, fb); }
+
+    // 업무일지 연동 (구분/진행상황/자재)
+    try{
+      const wl = sp(localStorage.getItem(KEY_WORKLOG), []);
+      if(Array.isArray(wl)){
+        let changed = false;
+        wl.forEach(r=>{
+          if(!r) return;
+          if(tabName==='categories' && r.category===oldName){ r.category=newName; changed=true; }
+          if(tabName==='statuses' && r.status===oldName){ r.status=newName; changed=true; }
+          if(tabName==='materials' && r.material===oldName){ r.material=newName; changed=true; }
+        });
+        if(changed) localStorage.setItem(KEY_WORKLOG, JSON.stringify(wl));
+      }
+    }catch(_){}
+
+    // 자재 사용기록 연동 (materials 탭만)
+    if(tabName==='materials'){
+      try{
+        const lg = sp(localStorage.getItem(KEY_LOG), []);
+        if(Array.isArray(lg)){
+          let changed=false;
+          lg.forEach(r=>{
+            if(r && r.material===oldName){ r.material=newName; changed=true; }
+          });
+          if(changed) localStorage.setItem(KEY_LOG, JSON.stringify(lg));
+        }
+      }catch(_){}
+
+      // 재고 기준(입고/기초재고) 키 변경
+      try{
+        const baseObj = sp(localStorage.getItem(KEY_BASE), {});
+        if(baseObj && typeof baseObj==='object' && !Array.isArray(baseObj)){
+          if(Object.prototype.hasOwnProperty.call(baseObj, oldName)){
+            const v = baseObj[oldName];
+            if(!Object.prototype.hasOwnProperty.call(baseObj, newName)){
+              baseObj[newName] = v;
+            }
+            delete baseObj[oldName];
+            localStorage.setItem(KEY_BASE, JSON.stringify(baseObj));
+          }
+        }
+      }catch(_){}
+    }
+  }
+
+  function updateHoliday(){
+    if(!editOld || !editOld.date) return;
+    const dIn = document.getElementById('holidayDate');
+    const input = document.getElementById('newItem');
+    const date = String(dIn && dIn.value ? dIn.value : '').slice(0,10);
+    const name = String(input.value||'').trim();
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(date) || !name){
+      alert('공휴일은 날짜와 이름을 입력해야 합니다.');
+      return;
+    }
+    let list = getHolidayList();
+    // remove old date
+    list = list.filter(x=>x.date !== editOld.date);
+    // upsert new
+    const idx = list.findIndex(x=>x.date===date);
+    if(idx>=0) list[idx].name = name; else list.push({date, name});
+    setHolidayList(list);
+    input.value='';
+    if(dIn) dIn.value='';
+    clearEdit();
+    render();
+  }
+
+function updateItem(){
+    if(tab==='holidays') return updateHoliday();
+    const input = document.getElementById('newItem');
+    const next = (input.value||'').trim();
+    if(!editOld) return alert('수정할 항목을 먼저 클릭하세요.');
+    if(!next) return alert('수정할 글자를 입력하세요.');
+
+    const list = getList(tab);
+    if(!list.includes(editOld)){
+      clearEdit();
+      return alert('수정 대상이 목록에 없습니다.');
+    }
+    if(next !== editOld && list.includes(next)) return alert('이미 존재하는 항목입니다.');
+
+    // 1) 목록에서 교체
+    const replaced = list.map(x => x===editOld ? next : x);
+    setList(tab, replaced);
+
+    // 2) 숨김 목록도 교체(있다면)
+    const h = loadHidden();
+    if(Array.isArray(h[tab]) && h[tab].includes(editOld)){
+      h[tab] = h[tab].map(x=> x===editOld ? next : x);
+      saveHidden(h);
+    }
+
+    // 3) 기존 저장 데이터 연동 치환
+    propagateRename(tab, editOld, next);
+
+    window.APP.log.add('ITEMS', `${tab} 수정: ${editOld} → ${next}`);
+
+    // 4) 상태 정리
+    input.value = '';
+    clearEdit();
+    render();
+  }
+
+
+  function safeParse(str, fallback){ return window.APP.util.safeParseJSON(str, fallback); }
+  function esc(s){ return window.APP.util.escapeHtml(s); }
+
+  function loadHidden(){
+    const o = safeParse(localStorage.getItem(KEY_HIDDEN), null);
+    if(!o || typeof o !== 'object'){
+      const init = {categories:[], statuses:[], materials:[]};
+      localStorage.setItem(KEY_HIDDEN, JSON.stringify(init));
+      return init;
+    }
+    o.categories = Array.isArray(o.categories) ? o.categories : [];
+    o.statuses = Array.isArray(o.statuses) ? o.statuses : [];
+    o.materials = Array.isArray(o.materials) ? o.materials : [];
+    return o;
+  }
+  function saveHidden(h){ localStorage.setItem(KEY_HIDDEN, JSON.stringify(h)); window.APP.backup.capture('items.hidden'); }
+
+  function getKeyByTab(t){
+    if(t==='categories') return KEY_CATEGORIES;
+    if(t==='statuses') return KEY_STATUSES;
+    if(t==='materials') return KEY_MATERIALS;
+    return KEY_HOLIDAYS;
+  }
+
+  
+  function normalizeHolidayList(arr){
+    const out = [];
+    const seen = new Set();
+    (Array.isArray(arr)?arr:[]).forEach(x=>{
+      if(!x || typeof x!=='object') return;
+      const d = String(x.date||'').slice(0,10);
+      const n = String(x.name||'').trim();
+      if(!/^\d{4}-\d{2}-\d{2}$/.test(d) || !n) return;
+      if(seen.has(d)) return;
+      seen.add(d);
+      out.push({date:d, name:n});
+    });
+    out.sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+    return out;
+  }
+
+  function getHolidayList(){
+    window.APP.migrate.run();
+    const arr = safeParse(localStorage.getItem(KEY_HOLIDAYS), []);
+    return normalizeHolidayList(arr);
+  }
+  function setHolidayList(arr){
+    localStorage.setItem(KEY_HOLIDAYS, JSON.stringify(normalizeHolidayList(arr)));
+    window.APP.backup && APP.backup.capture && APP.backup.capture('holidays.edit');
+    window.APP.log && APP.log.add && APP.log.add('HOLIDAY','공휴일 변경');
+  }
+
+  function beginEditHolidayByDate(ds){
+    const d = String(ds||'').slice(0,10);
+    const list = getHolidayList();
+    const h = list.find(x=>x.date===d);
+    if(h) beginEditHoliday(h);
+  }
+
+function beginEditHoliday(h){
+    const dIn = document.getElementById('holidayDate');
+    const input = document.getElementById('newItem');
+    if(dIn){ dIn.style.display='block'; dIn.value = h.date || ''; }
+    input.value = h.name || '';
+    editOld = { date: h.date, name: h.name };
+    const btn = document.getElementById('btnUpdate');
+    if(btn){ btn.disabled = false; }
+    input.focus();
+  }
+
+function getList(t){
+    window.APP.migrate.run();
+    const key = getKeyByTab(t);
+    const arr = safeParse(localStorage.getItem(key), []);
+    return Array.isArray(arr) ? arr : [];
+  }
+  function setList(t, arr){
+    const key = getKeyByTab(t);
+    localStorage.setItem(key, JSON.stringify(arr));
+    window.APP.backup.capture('items.setList');
+  }
+
+  function hintFor(t){
+    if(t==='categories') return '업무일지의 "구분" 드롭다운에 연동됩니다.';
+    if(t==='statuses') return '업무일지의 "진행상황" 드롭다운에 연동됩니다.';
+    if(t==='materials') return '업무일지의 "자재" 목록 및 자재일지 재고 계산에 사용됩니다.';
+    return '홈 달력/모든 화면의 날짜 색상에 즉시 적용됩니다.';
+  }
+
+  function switchTab(next, btn){
+    tab = next;
+    document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('newItem').value='';
+    const dIn = document.getElementById('holidayDate');
+    const btnReset = document.querySelector('button.mini[onclick="resetToDefaults()"]');
+    const btnHidden = document.querySelector('button.mini.danger[onclick="clearHidden()"]');
+    if(dIn){ dIn.style.display = (tab==='holidays') ? 'block' : 'none'; dIn.value=''; }
+    if(btnReset) btnReset.style.display = (tab==='holidays') ? 'none' : 'inline-block';
+    if(btnHidden) btnHidden.style.display = (tab==='holidays') ? 'none' : 'inline-block';
+    const inp = document.getElementById('newItem');
+    if(inp) inp.placeholder = (tab==='holidays') ? '공휴일 이름 입력' : '추가할 항목 입력';
+
+    clearEdit();
+    render();
+  }
+
+  function addHoliday(){
+    const dIn = document.getElementById('holidayDate');
+    const input = document.getElementById('newItem');
+    const date = String(dIn && dIn.value ? dIn.value : '').slice(0,10);
+    const name = String(input.value||'').trim();
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(date) || !name){
+      alert('공휴일은 날짜와 이름을 입력해야 합니다.');
+      return;
+    }
+    const list = getHolidayList();
+    const idx = list.findIndex(x=>x.date===date);
+    if(idx>=0){
+      list[idx].name = name;
+    }else{
+      list.push({date, name});
+    }
+    setHolidayList(list);
+    input.value='';
+    if(dIn) dIn.value='';
+    clearEdit();
+    render();
+  }
+
+function addItem(){
+    if(tab==='holidays') return addHoliday();
+    const input = document.getElementById('newItem');
+    const v = (input.value||'').trim();
+    if(!v) return;
+
+    const list = getList(tab);
+    const h = loadHidden();
+    const hidden = new Set(h[tab] || []);
+
+    // 이미 목록에 존재하지만 숨김된 항목이면 "추가"가 아니라 "복원"으로 처리
+    if(list.includes(v)){
+      if(hidden.has(v)){
+        restoreItem(v);
+        window.APP.log.add('ITEMS', `${tab} 기본항목 복원: ${v}`);
+        input.value='';
+        clearEdit();
+        return;
+      }
+      return alert('이미 존재합니다.');
+    }
+
+    list.push(v);
+    setList(tab, list);
+    window.APP.log.add('ITEMS', `${tab} 추가: ${v}`);
+    input.value='';
+    clearEdit();
+    render();
+  }
+
+
+  function deleteItem(name){
+    const defaults = DEFAULTS[tab] || [];
+    const list = getList(tab);
+
+    // 기본항목이면 숨김 처리
+    if(defaults.includes(name)){
+      const h = loadHidden();
+      if(!h[tab].includes(name)) h[tab].push(name);
+      saveHidden(h);
+      window.APP.log.add('ITEMS', `${tab} 기본항목 숨김: ${name}`);
+      render();
+      return;
+    }
+
+    // 사용자 항목은 완전 삭제
+    if(!confirm('삭제할까요?')) return;
+    const next = list.filter(x=>x!==name);
+    setList(tab, next);
+    window.APP.log.add('ITEMS', `${tab} 삭제: ${name}`);
+    render();
+  }
+
+  let __showHidden = false;
+
+  function restoreItem(name){
+    const h = loadHidden();
+    h[tab] = Array.isArray(h[tab]) ? h[tab] : [];
+    const before = h[tab].length;
+    h[tab] = h[tab].filter(x=>x!==name);
+    if(h[tab].length !== before){
+      saveHidden(h);
+      window.APP.log.add('ITEMS', `${tab} 숨김해제: ${name}`);
+    }
+    render();
+  }
+
+  function toggleHidden(){
+    __showHidden = !__showHidden;
+    render();
+  }
+
+  function resetToDefaults(){
+    if(!confirm('현재 탭을 기본값으로 되돌릴까요?')) return;
+    const h = loadHidden();
+    h[tab] = [];
+    saveHidden(h);
+
+    const defaults = DEFAULTS[tab] || [];
+    setList(tab, defaults.slice());
+    window.APP.log.add('ITEMS', `${tab} 기본값 복원`);
+    render();
+  }
+
+  function clearHidden(){
+    if(!confirm('숨김 목록을 전체 초기화할까요?')) return;
+    localStorage.setItem(KEY_HIDDEN, JSON.stringify({categories:[], statuses:[], materials:[]}));
+    window.APP.log.add('ITEMS', '숨김 목록 초기화');
+    window.APP.backup.capture('items.clearHidden');
+    render();
+  }
+
+  function render(){
+    const listEl = document.getElementById('list');
+    const hiddenTitle = document.getElementById('hiddenTitle');
+    const hiddenHint = document.getElementById('hiddenHint');
+    const hiddenListEl = document.getElementById('hiddenList');
+    const btnToggleHidden = document.getElementById('btnToggleHidden');
+    const hintEl = document.getElementById('tabHint');
+    hintEl.textContent = hintFor(tab);
+
+    const h = loadHidden();
+    const hiddenArr = Array.isArray(h[tab]) ? h[tab] : [];
+    const hidden = new Set(hiddenArr);
+
+    const list = getList(tab);
+    const visible = list.filter(x=>!hidden.has(x));
+
+    document.getElementById('countHint').textContent =
+      `표시 ${visible.length}개 / 전체 ${list.length}개 (숨김 ${hiddenArr.length}개)`;
+
+    // 1) 표시 목록
+    listEl.innerHTML='';
+    if(visible.length===0){
+      listEl.innerHTML = '<div class="hint" style="padding:12px 0">표시할 항목이 없습니다.</div>';
+    }else{
+      visible.forEach(name=>{
+        const div = document.createElement('div');
+        div.className = 'item';
+        div.innerHTML = `
+          <div>
+            <div class="name">${esc(name)}</div>
+          </div>
+          <div style="text-align:right">
+            <button class="mini danger">삭제</button>
+          </div>
+        `;
+        div.querySelector('button').addEventListener('click', (e)=>{ e.stopPropagation(); deleteItem(name); });
+        div.addEventListener('click', ()=>{ beginEdit(name); });
+        listEl.appendChild(div);
+      });
+    }
+
+    // 2) 숨김 목록
+    if(hiddenTitle && hiddenListEl && hiddenHint && btnToggleHidden){
+      if(hiddenArr.length===0){
+        hiddenTitle.style.display = 'none';
+        hiddenListEl.style.display = 'none';
+      }else{
+        hiddenTitle.style.display = 'flex';
+        hiddenHint.textContent = `${hiddenArr.length}개`;
+        btnToggleHidden.textContent = __showHidden ? '접기' : '보기';
+        hiddenListEl.style.display = __showHidden ? 'block' : 'none';
+
+        if(__showHidden){
+          hiddenListEl.innerHTML='';
+          hiddenArr.forEach(name=>{
+            const div = document.createElement('div');
+            div.className = 'item hidden';
+            div.innerHTML = `
+              <div>
+                <div class="name">${esc(name)}<span class="badge">숨김됨</span></div>
+              </div>
+              <div style="text-align:right">
+                <button class="mini">복원</button>
+              </div>
+            `;
+            div.querySelector('button').addEventListener('click', (e)=>{ e.stopPropagation(); restoreItem(name); });
+            div.addEventListener('click', ()=>{ beginEdit(name); });
+            hiddenListEl.appendChild(div);
+          });
+        }
+      }
+    }
+  }
+
+
+  function downloadJson(filename, obj){
+    const blob = new Blob([JSON.stringify(obj, null, 2)], {type:'application/json'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(a.href);
+  }
+
+  function backupTab(){
+    const data = getList(tab);
+    const obj = {meta:{app:'WorkLogPRO',schema:window.APP.SCHEMA_VERSION,createdAt:new Date().toISOString()}, tab, key:getKeyByTab(tab), data};
+    downloadJson(`items_${tab}_${window.APP.util.stamp()}.json`, obj);
+    window.APP.log.add('BACKUP', `항목관리(${tab}) 백업 다운로드`);
+  }
+
+  function restoreTab(){
+    const file = document.getElementById('restoreFile').files[0];
+    if(!file) return alert('복원 파일을 선택해 주세요.');
+    const r = new FileReader();
+    r.onload = ()=>{
+      try{
+        const obj = JSON.parse(String(r.result||''));
+        const data = obj && obj.data ? obj.data : obj;
+        if(!Array.isArray(data)) return alert('파일 형식이 올바르지 않습니다.');
+        if(!confirm('현재 탭의 목록이 덮어써집니다. 복원할까요?')) return;
+
+        // 숨김은 유지하되, 기본값은 migrate가 보장
+        setList(tab, data);
+        window.APP.migrate.run();
+        window.APP.log.add('BACKUP', `항목관리(${tab}) 복원 완료`);
+        render();
+      }catch(e){
+        alert('복원 실패: 파일을 읽을 수 없습니다.');
+      }
+    };
+    r.readAsText(file, 'utf-8');
+  }
+
+  // init
+  window.APP.migrate.run();
+  render();
+</script>
+</body>
+</html>

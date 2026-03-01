@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>일정표</title>
+<style>
+body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,'Noto Sans KR',sans-serif;background:#0f172a;color:#e5e7eb;}
+.wrap{max-width:980px;margin:auto;padding:16px;box-sizing:border-box;}
+.header{font-size:20px;font-weight:1000;margin:0 0 10px;}
+.card{background:#020617;border:1px solid rgba(255,255,255,.10);border-radius:16px;padding:16px;box-sizing:border-box;margin-bottom:14px;}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+input,select,textarea,button{
+  padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,.10);box-sizing:border-box;
+  background:#0b1220;color:#e5e7eb;
+}
+input,select{flex:1;min-width:160px}
+textarea{width:100%;min-height:90px;resize:vertical}
+button{cursor:pointer;font-weight:1000}
+button:hover{filter:brightness(1.08)}
+button.danger{background:#7c2d12}
+button.danger:hover{background:#991b1b}
+button.ghost{background:transparent}
+button.ghost:hover{background:#0b1220}
+
+.small{opacity:.82;font-size:13px;line-height:1.4}
+.hr{height:1px;background:rgba(255,255,255,.08);margin:10px 0;}
+
+.list{border-top:1px solid rgba(255,255,255,.10);padding-top:10px;margin-top:10px;}
+.item{
+  padding:10px 10px;border-bottom:1px solid rgba(255,255,255,.06);
+  border-radius:12px;
+  cursor:pointer;
+}
+.item:hover{background:#0b1220}
+.item.selected{outline:2px solid rgba(37,99,235,.75);background:#0b1220}
+.meta{opacity:.75;font-size:12px;margin-bottom:4px}
+.txt{font-size:14px;line-height:1.35;white-space:pre-wrap}
+.pager{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:10px}
+.pager button{width:auto;padding:8px 10px}
+.pager .info{opacity:.85;font-size:13px}
+.badge{display:inline-block;font-size:12px;opacity:.9;background:#0b1220;border:1px solid rgba(255,255,255,.10);padding:2px 8px;border-radius:999px;margin-left:8px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="header">일정표</div>
+
+  <div class="card">
+    <div class="small">날짜를 지정하고 일정을 저장합니다. 리스트의 항목을 클릭하면 입력창에 불러와서 수정할 수 있습니다. 저장된 일정은 HOME 달력에도 반영됩니다.</div>
+
+    <div class="row" style="margin-top:10px">
+      <div style="flex:1;min-width:160px">
+        날짜
+        <input type="date" id="schDate">
+      </div>
+      <div style="flex:1;min-width:160px">
+        시간(선택)
+        <input type="time" id="schTime">
+      </div>
+    </div>
+
+    내용
+    <textarea id="schText" placeholder="일정 내용을 입력"></textarea>
+
+    <div class="row" style="margin-top:10px">
+      <button id="btnSave" onclick="saveSch()">저장</button>
+      <button id="btnUpdate" class="ghost" onclick="updateSch()" style="display:none">수정</button>
+      <button id="btnDelete" class="danger" onclick="deleteSelected()" style="display:none">삭제</button>
+      <button class="ghost" onclick="rewrite()">다시쓰기</button>
+      <button class="danger" onclick="purgeSch()">전체 삭제</button>
+      <span class="badge" id="selBadge" style="display:none">선택됨</span>
+    </div>
+
+    <div class="hr"></div>
+
+    <div class="small">백업 / 불러오기</div>
+    <div class="row">
+      <button onclick="backupSch()">백업 다운로드</button>
+      <input id="restoreFile" type="file" accept="application/json">
+      <button class="danger" onclick="restoreSch()">불러오기(복원)</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="row">
+      <select id="perPage" onchange="goPage(1)">
+        <option value="10">10개</option>
+        <option value="20">20개</option>
+        <option value="30">30개</option>
+        <option value="50">50개</option>
+        <option value="100">100개</option>
+      </select>
+      <input id="q" placeholder="검색어 (내용 검색)" oninput="goPage(1)">
+      <button onclick="goPage(1)">적용</button>
+    </div>
+
+    <div class="list" id="list"></div>
+
+    <div class="pager">
+      <button onclick="prevPage()">◀</button>
+      <button onclick="nextPage()">▶</button>
+      <div class="info" id="pageInfo"></div>
+    </div>
+  </div>
+</div>
+
+<script src="app_core.js"></script>
+<script>
+const KEY = window.APP.KEYS.SCHEDULE;
+
+let db = window.APP.store.getJSON(KEY, []);
+let page = 1;
+let selectedId = null;
+
+function save(){ window.APP.store.setJSON(KEY, db); window.APP.backup.capture('schedule'); }
+function short15(t){ return window.APP.util.short(t, 15); }
+function todayStr(){ return window.APP.util.todayISO(); }
+
+function rewrite(){
+  selectedId = null;
+  document.getElementById('schDate').value = todayStr();
+  document.getElementById('schTime').value = '';
+  document.getElementById('schText').value = '';
+  setEditMode(false);
+  render();
+}
+
+function setEditMode(on){
+  document.getElementById('btnSave').style.display   = on ? 'none' : 'inline-block';
+  document.getElementById('btnUpdate').style.display = on ? 'inline-block' : 'none';
+  document.getElementById('btnDelete').style.display = on ? 'inline-block' : 'none';
+  document.getElementById('selBadge').style.display  = on ? 'inline-block' : 'none';
+}
+
+function pick(id){
+  const it = db.find(x=>x.id===id);
+  if(!it) return;
+  selectedId = id;
+  document.getElementById('schDate').value = it.date || todayStr();
+  document.getElementById('schTime').value = it.time || '';
+  document.getElementById('schText').value = it.text || '';
+  setEditMode(true);
+  render();
+}
+
+function saveSch(){
+  const date = document.getElementById('schDate').value;
+  const time = document.getElementById('schTime').value;
+  const text = document.getElementById('schText').value.trim();
+  if(!date || !text) return;
+
+  const id = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now())+Math.random());
+  db.push({id, date, time, text, ts: Date.now()});
+  save();
+  window.APP.log.add('SCHEDULE', `일정 저장: ${date} / ${short15(text)}`);
+  rewrite();
+}
+
+function updateSch(){
+  if(!selectedId) return alert('수정할 항목 선택');
+  const date = document.getElementById('schDate').value;
+  const time = document.getElementById('schTime').value;
+  const text = document.getElementById('schText').value.trim();
+  if(!date || !text) return;
+
+  const idx = db.findIndex(x=>x.id===selectedId);
+  if(idx < 0) return;
+
+  db[idx] = {...db[idx], date, time, text, ts: Date.now()};
+  save();
+  window.APP.log.add('SCHEDULE', `일정 수정: ${date} / ${short15(text)}`);
+  rewrite();
+}
+
+function deleteSelected(){
+  if(!selectedId) return alert('삭제할 항목 선택');
+  if(!confirm('선택한 일정 삭제?')) return;
+
+  const it = db.find(x=>x.id===selectedId);
+  db = db.filter(x=>x.id!==selectedId);
+  save();
+  window.APP.log.add('SCHEDULE', `일정 삭제: ${it?it.date:''} / ${it?short15(it.text):''}`);
+  rewrite();
+}
+
+function purgeSch(){
+  if(!confirm('일정 전체 삭제?')) return;
+  db = [];
+  save();
+  window.APP.log.add('SCHEDULE', '일정 전체 삭제');
+  rewrite();
+}
+
+function downloadJson(filename, obj){
+  const blob = new Blob([JSON.stringify(obj, null, 2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(a.href);
+}
+
+function backupSch(){
+  const obj = {meta:{app:"WorkLogPRO",schema:window.APP.SCHEMA_VERSION,createdAt:new Date().toISOString()}, key:KEY, data: db};
+  downloadJson(`schedule_${window.APP.util.stamp()}.json`, obj);
+  window.APP.log.add('BACKUP', '일정 백업 다운로드');
+}
+
+function restoreSch(){
+  const file = document.getElementById('restoreFile').files[0];
+  if(!file) return alert('복원 파일을 선택해 주세요.');
+  const reader = new FileReader();
+  reader.onload = () => {
+    try{
+      const obj = JSON.parse(reader.result);
+      const data = obj && obj.data ? obj.data : obj;
+      if(!Array.isArray(data)) return alert('파일 형식이 올바르지 않습니다.');
+      if(!confirm('기존 일정이 덮어써집니다. 불러올까요?')) return;
+      db = data;
+      save();
+      window.APP.log.add('BACKUP', '일정 불러오기(복원) 완료');
+      rewrite();
+    }catch(e){
+      alert('복원 실패: 파일을 읽을 수 없습니다.');
+    }
+  };
+  reader.readAsText(file, 'utf-8');
+}
+
+function filtered(){
+  const q = document.getElementById('q').value.trim().toLowerCase();
+  let arr = db.slice();
+  if(q) arr = arr.filter(x => (x.text||'').toLowerCase().includes(q));
+  arr.sort((a,b)=>((a.date+(a.time||''))>(b.date+(b.time||'')))?1:-1);
+  return arr;
+}
+
+function deleteDirect(id){
+  if(!confirm('삭제할까요?')) return;
+  const it = db.find(x=>x.id===id);
+  db = db.filter(x=>x.id!==id);
+  save();
+  window.APP.log.add('SCHEDULE', `일정 삭제: ${it?it.date:''} / ${it?short15(it.text):''}`);
+  if(selectedId === id) rewrite();
+  render();
+}
+
+function render(){
+  const list = document.getElementById('list');
+  const per = parseInt(document.getElementById('perPage').value, 10);
+  const arr = filtered();
+  const total = arr.length;
+  const totalPages = Math.max(1, Math.ceil(total / per));
+  if(page > totalPages) page = totalPages;
+
+  const start = (page-1)*per;
+  const slice = arr.slice(start, start+per);
+
+  list.innerHTML = '';
+  if(slice.length === 0){
+    list.innerHTML = '<div class="small" style="padding:10px 0;opacity:.7">표시할 일정이 없습니다.</div>';
+  }else{
+    slice.forEach(x=>{
+      const div = document.createElement('div');
+      div.className = 'item' + (x.id===selectedId ? ' selected' : '');
+      div.onclick = ()=>pick(x.id);
+      div.innerHTML = `
+        <div style="display:flex; align-items:center; gap:10px;">
+          <div style="flex:1;">
+            <div class="meta">${window.APP.util.escapeHtml(x.date)} ${x.time?window.APP.util.escapeHtml(x.time):''}</div>
+            <div class="txt">${window.APP.util.escapeHtml(x.text)}</div>
+          </div>
+          <div style="width:80px; text-align:right;">
+            <button class="danger" style="width:auto"
+              onclick="event.stopPropagation(); deleteDirect('${x.id}')">삭제</button>
+          </div>
+        </div>
+      `;
+      list.appendChild(div);
+    });
+  }
+  document.getElementById('pageInfo').textContent = `페이지 ${page} / ${totalPages} (총 ${total}건)`;
+}
+
+function goPage(p){ page = p; render(); }
+function prevPage(){ if(page>1){page--; render();} }
+function nextPage(){
+  const per = parseInt(document.getElementById('perPage').value, 10);
+  const totalPages = Math.max(1, Math.ceil(filtered().length / per));
+  if(page<totalPages){page++; render();}
+}
+
+document.addEventListener('DOMContentLoaded', ()=>{
+  // safety + migrate
+  window.APP.migrate.run();
+
+  document.getElementById('schDate').value = todayStr();
+  setEditMode(false);
+
+  // home hinted date
+  const hint = localStorage.getItem('home_openScheduleDate');
+  if(hint){ document.getElementById('schDate').value = hint; localStorage.removeItem('home_openScheduleDate'); }
+
+  render();
+});
+</script>
+</body>
+</html>
