@@ -78,11 +78,7 @@
     td{color:var(--text);}
     .content-cell{ text-align:left; }
     .narrow-cell{ width:80px; text-align:center; white-space:nowrap; }
-    .date-cell{ width:140px; text-align:center; white-space:nowrap; }
-    .dateTag{font-weight:1000}
-    .dateSat{color:rgba(56,189,248,.95)}
-    .dateSun{color:rgba(239,68,68,.95)}
-    .dateHol{color:rgba(239,68,68,.95)}
+    .date-cell{ width:120px; text-align:center; white-space:nowrap; }
     tr:hover td{background:rgba(255,255,255,.03)}
     .rowBtn{display:flex; gap:6px; justify-content:flex-end}
     .hint{font-size:12px;color:rgba(229,231,235,.65); line-height:1.3}
@@ -309,28 +305,6 @@ function normalizeDb(arr){
   });
 }
 function escapeHtml(s){ return window.APP.util.escapeHtml(s); }
-
-function dateClass(d){
-  const ds = String(d||'').slice(0,10);
-  const hol = (window.APP.holidays && APP.holidays.isHoliday) ? APP.holidays.isHoliday(ds) : false;
-  if(hol) return 'dateHol';
-  if(window.APP.util.isSunday(ds)) return 'dateSun';
-  if(window.APP.util.isSaturday(ds)) return 'dateSat';
-  return '';
-}
-function dateLabelWithHoliday(d){
-  const ds = String(d||'').slice(0,10);
-  const base = window.APP.util.dateLabel(ds);
-  const hn = (window.APP.holidays && APP.holidays.name) ? APP.holidays.name(ds) : '';
-  return hn ? (base + ' ' + hn) : base;
-}
-function renderDate(d){
-  const ds = String(d||'').slice(0,10);
-  const cls = dateClass(ds);
-  const label = dateLabelWithHoliday(ds);
-  return `<span class="dateTag ${cls}">${escapeHtml(label)}</span>`;
-}
-
 
 /* 자재일지 동기화: WorkLog → MaterialLog (단방향) */
 function syncMaterialLogFromWorklog(){
@@ -590,7 +564,7 @@ function render(){
   pageItems.forEach(r=>{
     const tr=document.createElement("tr");
     tr.innerHTML = `
-      <td class="date-cell">${renderDate(r.date)}</td>
+      <td class="date-cell">${escapeHtml(r.date)}</td>
       <td class="narrow-cell">${renderMaybeDeleted(r.category, catsList, 'categories')}</td>
       <td class="content-cell">${escapeHtml(r.content||"")}</td>
       <td class="narrow-cell">${renderMaybeDeleted(r.status, stList, 'statuses')}</td>

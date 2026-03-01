@@ -1,0 +1,702 @@
+<!doctype html>
+
+<html lang="ko">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>HOME</title>
+<style>
+  :root{
+    --bg:#0b1020;
+    --panel:#071024;
+    --panel2:#0b1734;
+    --text:#e5e7eb;
+    --muted:rgba(229,231,235,.72);
+    --line:rgba(255,255,255,.10);
+    --accent:#2563eb;
+    --sun:#ef4444;
+    --sat:#38bdf8;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,'Noto Sans KR',sans-serif;background:radial-gradient(1200px 600px at 30% 10%, rgba(37,99,235,.14), transparent 55%), var(--bg);color:var(--text)}
+  .wrap{max-width:1400px;margin:0 auto;padding:14px}
+  .topbar{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px}
+  .title{font-size:22px;font-weight:1000;letter-spacing:.2px}
+  .subtitle{font-size:12px;color:var(--muted)}
+  .nav{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .nav button{
+    background:rgba(255,255,255,.06);
+    border:1px solid var(--line);
+    color:var(--text);
+    padding:8px 10px;
+    border-radius:12px;
+    font-weight:1000;
+    cursor:pointer;
+  }
+  .nav button:hover{filter:brightness(1.08)}
+  .pill{display:inline-flex;align-items:center;gap:8px;background:rgba(255,255,255,.06);border:1px solid var(--line);border-radius:999px;padding:8px 12px;color:var(--text)}
+
+  .kpis{display:grid;grid-template-columns:repeat(4, 1fr);gap:10px;margin:10px 0}
+  @media(max-width:1100px){.kpis{grid-template-columns:repeat(2, 1fr)}}
+  @media(max-width:620px){.kpis{grid-template-columns:1fr}}
+  .kpi{
+    background:linear-gradient(180deg, rgba(255,255,255,.07), rgba(255,255,255,.02));
+    border:1px solid var(--line);
+    border-radius:18px;
+    padding:12px;
+    min-height:72px;
+  }
+  .kpi .label{font-size:12px;color:var(--muted);font-weight:900}
+  .kpi .val{font-size:20px;font-weight:1000;margin-top:6px}
+  .kpi .sub{font-size:12px;color:rgba(229,231,235,.70);margin-top:4px}
+
+  .grid{display:grid;grid-template-columns: 1.2fr 1fr; gap:12px;}
+  @media(max-width:1100px){.grid{grid-template-columns:1fr}}
+
+  .card{
+    background:linear-gradient(180deg, rgba(255,255,255,.07), rgba(255,255,255,.02));
+    border:1px solid var(--line);
+    border-radius:18px;
+    padding:14px;
+  }
+  .card h2{margin:0 0 6px 0;font-size:16px;font-weight:1000}
+  .card .hint{font-size:12px;color:var(--muted);line-height:1.35}
+
+  /* calendar */
+  .calHead{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-top:10px}
+  .monthLabel{font-weight:1000;opacity:.95}
+  .dow{display:grid;grid-template-columns:repeat(7, 1fr);gap:8px;margin-top:10px}
+  .dow div{font-size:12px;color:rgba(229,231,235,.70);text-align:center;font-weight:900}
+  .dow .sun{color:rgba(239,68,68,.95)}
+  .dow .sat{color:rgba(56,189,248,.95)}
+
+  .calGrid{display:grid;grid-template-columns:repeat(7, 1fr);gap:8px;margin-top:8px}
+  .day{
+    border:1px solid rgba(255,255,255,.10);
+    background:rgba(2,6,23,.50);
+    border-radius:14px;
+    min-height:78px;
+    padding:8px;
+    cursor:pointer;
+    position:relative;
+    display:flex;
+    flex-direction:column;
+    align-items:flex-start;
+    justify-content:flex-start;
+    gap:6px;
+  }
+  .day:hover{filter:brightness(1.10)}
+  .day.muted{opacity:.30;cursor:default}
+  .num{font-weight:1000}
+  .sunNum{color:rgba(239,68,68,.95)}
+  .satNum{color:rgba(56,189,248,.95)}
+  .dayTop{display:flex;align-items:center;gap:6px}
+  .dot{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.75);display:inline-block;flex:0 0 auto}
+  .daySch{font-size:11px;line-height:1.25;color:rgba(229,231,235,.78)}
+  .daySch .line{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+  .day.selected{outline:2px solid rgba(37,99,235,.85)}
+  .day.today{box-shadow:0 0 0 2px rgba(37,99,235,.20) inset}
+
+  .split{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
+  @media(max-width:1100px){.split{grid-template-columns:1fr}}
+
+  /* tables */
+  table{width:100%;border-collapse:collapse;margin-top:10px;font-size:13px}
+  th,td{border-bottom:1px solid rgba(255,255,255,.10);padding:10px 8px;vertical-align:top}
+  th{color:rgba(229,231,235,.85);font-size:12px;text-align:left;white-space:nowrap;font-weight:900}
+  td{color:var(--text)}
+  .right{text-align:right}
+
+  /* 숨김/삭제 항목 표시(취소선) */
+  .deleted{ text-decoration:line-through; opacity:.75 }
+
+  .list{margin-top:10px;border-top:1px solid rgba(255,255,255,.10)}
+  .li{padding:10px 6px;border-bottom:1px solid rgba(255,255,255,.06)}
+  .li .meta{font-size:12px;color:rgba(229,231,235,.70);margin-bottom:4px}
+  .li .txt{font-size:13px;white-space:pre-wrap}
+
+  .btnSmall{padding:8px 10px;border-radius:12px;background:rgba(255,255,255,.06);border:1px solid var(--line);color:var(--text);font-weight:1000;cursor:pointer}
+  .btnSmall:hover{filter:brightness(1.08)}
+
+  /* 변화내역 페이저 */
+  .pager{display:flex;justify-content:center;align-items:center;gap:10px;margin-top:10px}
+  .pager button{
+    background:rgba(255,255,255,.06);
+    border:1px solid var(--line);
+    color:var(--text);
+    padding:8px 12px;
+    border-radius:12px;
+    font-weight:1000;
+    cursor:pointer;
+    height:34px;
+    display:inline-flex;
+    align-items:center;
+  }
+  .pager button:disabled{opacity:.45;cursor:not-allowed}
+  .pager .pageInfo{
+    min-width:88px;
+    text-align:center;
+    font-weight:1000;
+    color:var(--muted);
+    line-height:34px;
+  }
+
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <div>
+      <div class="title">HOME</div>
+      <div class="subtitle">달력 날짜 클릭 → 아래에 해당 날짜 일정 표시 / 일정 저장 시 자동 반영</div>
+    </div>
+    <div class="nav">
+      <span class="pill" id="monthPill">0000-00</span>
+      <button onclick="moveMonth(-1)">◀</button>
+      <button onclick="goToday()">오늘</button>
+      <button onclick="moveMonth(1)">▶</button>
+    </div>
+  </div>
+
+  <div class="kpis">
+    <div class="kpi"><div class="label">오늘 일정</div><div class="val" id="k_todaySch">0</div><div class="sub" id="k_todaySchSub">-</div></div>
+    <div class="kpi"><div class="label">이번달 일정</div><div class="val" id="k_monthSch">0</div><div class="sub" id="k_monthSchSub">-</div></div>
+    <div class="kpi"><div class="label">미처리 업무</div><div class="val" id="k_openWork">0</div><div class="sub" id="k_openWorkSub">처리완료 제외</div></div>
+    <div class="kpi"><div class="label">재고 경고</div><div class="val" id="k_lowStock">0</div><div class="sub" id="k_lowStockSub">잔여 ≤ 5</div></div>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <h2>달력</h2>
+      <div class="hint">일정 있는 날: 날짜 옆 ● / 토요일: 하늘색 / 일요일: 빨간색</div>
+
+      <div class="calHead">
+        <div class="monthLabel" id="monthLabel"></div>
+        <div class="hint" style="display:flex;align-items:center;gap:10px">
+          일정 있는 날: 날짜 옆 <span class="dot" style="position:static;display:inline-block"></span>
+        </div>
+      </div>
+
+      <div class="dow">
+        <div class="sun">일</div><div>월</div><div>화</div><div>수</div><div>목</div><div>금</div><div class="sat">토</div>
+      </div>
+      <div class="calGrid" id="cal"></div>
+
+      <div class="card" style="margin-top:12px;background:rgba(2,6,23,.35)">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+          <div>
+            <div style="font-weight:1000" id="selTitle">- 일정 (0건)</div>
+            <div class="hint">• 캘린더 날짜 클릭 또는 우측 '일정표(미리보기)'의 날짜 클릭</div>
+          </div>
+          <button class="btnSmall" onclick="jumpToSchedule()">일정표로 이동</button>
+        </div>
+        <div class="list" id="selList"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>일정표(미리보기)</h2>
+      <div class="hint">최근 일정(날짜 기준) 10개 / 내용 10자 제한 / 선택하면 좌측 아래에 해당 날짜 일정 표시</div>
+
+      <table>
+        <thead>
+          <tr>
+            <th style="width:120px">날짜</th>
+            <th>내용</th>
+            <th style="width:70px" class="right">건수</th>
+          </tr>
+        </thead>
+        <tbody id="previewBody"></tbody>
+      </table>
+
+      <div class="split">
+        <div class="card" style="background:rgba(2,6,23,.35)">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+            <div>
+              <h2 style="margin:0;font-size:16px">변동내역</h2>
+              <div class="hint">최근 100건</div>
+            </div>
+            <button class="btnSmall" onclick="refreshAll()">새로고침</button>
+          </div>
+          <table>
+            <thead>
+              <tr><th style="width:120px">시간</th><th>내용</th></tr>
+            </thead>
+            <tbody id="chBody"></tbody>
+          </table>
+          <div class="pager">
+            <button class="btnSmall" id="chPrevBtn" onclick="chPrev()">이전</button>
+            <div class="pageInfo" id="chPageInfo">1 / 1</div>
+            <button class="btnSmall" id="chNextBtn" onclick="chNext()">다음</button>
+          </div>
+
+        </div>
+
+        <div class="card" style="background:rgba(2,6,23,.35)">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+            <div>
+              <h2 style="margin:0;font-size:16px">재고 요약</h2>
+              <div class="hint">자재 / 초기 / 사용 / 잔여</div>
+            </div>
+            <button class="btnSmall" onclick="jumpToMaterials()">자재일지로 이동</button>
+          </div>
+          <table>
+            <thead>
+              <tr><th>자재</th><th class="right">초기</th><th class="right">사용</th><th class="right">잔여</th></tr>
+            </thead>
+            <tbody id="stockMini"></tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script src="app_core.js"></script>
+<script>
+  const K = window.APP.KEYS;
+
+  // ====== State ======
+  let viewYear, viewMonth; // month 0-11
+  let selectedDate = window.APP.util.todayISO();
+
+  // ====== Data getters ======
+  function getSchedule(){
+    const arr = window.APP.store.getJSON(K.SCHEDULE, []);
+    return Array.isArray(arr) ? arr : [];
+  }
+  function getWorklog(){
+    const arr = window.APP.store.getJSON(K.WORKLOG, []);
+    return Array.isArray(arr) ? arr : [];
+  }
+  function getChangeLog(){
+    const arr = window.APP.store.getJSON(K.CHANGELOG, []);
+    return Array.isArray(arr) ? arr : [];
+  }
+  function getMaterials(){
+    const arr = window.APP.store.getJSON(K.MATERIALS, []);
+    return Array.isArray(arr) ? arr : [];
+  }
+  function getMaterialLog(){
+    const arr = window.APP.store.getJSON(K.MATERIAL_LOG, []);
+    return Array.isArray(arr) ? arr : [];
+  }
+  function getStockBase(){
+    const obj = window.APP.store.getJSON(K.STOCK_BASE, {});
+    return (obj && typeof obj==='object' && !Array.isArray(obj)) ? obj : {};
+  }
+
+  function monthKey(y,m){
+    return y+'-'+String(m+1).padStart(2,'0');
+  }
+
+  function toYMD(d){
+    return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  }
+
+  function fmtTime(ts){
+    const d=new Date(ts);
+    const y=String(d.getFullYear());
+    const mo=String(d.getMonth()+1).padStart(2,'0');
+    const da=String(d.getDate()).padStart(2,'0');
+    const hh=String(d.getHours()).padStart(2,'0');
+    const mm=String(d.getMinutes()).padStart(2,'0');
+    return `${mo}-${da} ${hh}:${mm}`;
+  }
+
+  // ====== Calendar ======
+  function buildScheduleMap(schedule){
+    const map = new Map();
+    schedule.forEach(s=>{
+      const d = s.date;
+      if(!d) return;
+      if(!map.has(d)) map.set(d, []);
+      map.get(d).push(s);
+    });
+    // sort inside day
+    for(const [d, arr] of map){
+      arr.sort((a,b)=> (String(a.time||'')+String(a.id||'')).localeCompare(String(b.time||'')+String(b.id||'')));
+    }
+    return map;
+  }
+
+  function renderCalendar(){
+    const cal = document.getElementById('cal');
+    cal.innerHTML='';
+
+    const schedule = getSchedule();
+    const schMap = buildScheduleMap(schedule);
+
+    document.getElementById('monthLabel').textContent = `${viewYear}-${String(viewMonth+1).padStart(2,'0')}`;
+    document.getElementById('monthPill').textContent = `${viewYear}-${String(viewMonth+1).padStart(2,'0')}`;
+
+    const first = new Date(viewYear, viewMonth, 1);
+    const last = new Date(viewYear, viewMonth+1, 0);
+
+    const startDow = first.getDay(); // 0 sun
+    const daysInMonth = last.getDate();
+
+    // previous month tail
+    const prevLast = new Date(viewYear, viewMonth, 0);
+    const prevDays = prevLast.getDate();
+
+    const cells = 42; // 6 weeks
+
+    for(let i=0;i<cells;i++){
+      const dayIdx = i - startDow + 1;
+      let d, isMuted=false;
+      if(dayIdx < 1){
+        d = new Date(viewYear, viewMonth-1, prevDays + dayIdx);
+        isMuted=true;
+      }else if(dayIdx > daysInMonth){
+        d = new Date(viewYear, viewMonth+1, dayIdx - daysInMonth);
+        isMuted=true;
+      }else{
+        d = new Date(viewYear, viewMonth, dayIdx);
+      }
+
+      const ymd = toYMD(d);
+      const dow = d.getDay();
+      const has = schMap.has(ymd) && schMap.get(ymd).length>0;
+
+      const div=document.createElement('div');
+      div.className = 'day' + (isMuted?' muted':'') + (ymd===selectedDate?' selected':'') + (ymd===window.APP.util.todayISO()?' today':'');
+
+      let numCls='num';
+      if(dow===0) numCls += ' sunNum';
+      if(dow===6) numCls += ' satNum';
+
+      let dayHtml = `<div class="dayTop"><div class="${numCls}">${d.getDate()}</div>` + (has?'<span class="dot"></span>':'') + `</div>`;
+
+      // 일정 미리보기: 하루 최대 3개, 각 6자까지. 4개 이상이면 "..." 표시
+      if(has && !isMuted){
+        const arr = schMap.get(ymd) || [];
+        const lines = [];
+        for(let k=0;k<Math.min(3, arr.length);k++){
+          lines.push(window.APP.util.short(String(arr[k].text||''), 6));
+        }
+        if(arr.length>=4) lines.push('...');
+        if(lines.length){
+          dayHtml += `<div class="daySch">` + lines.map(t=>`<div class="line">${window.APP.util.escapeHtml(t)}</div>`).join('') + `</div>`;
+        }
+      }
+
+      div.innerHTML = dayHtml;
+
+      if(!isMuted){
+        div.addEventListener('click', ()=>selectDate(ymd));
+      }
+
+      cal.appendChild(div);
+    }
+
+    // KPIs
+    renderKPIs(schMap);
+  }
+
+  function selectDate(ymd){
+    selectedDate = ymd;
+    renderCalendar();
+    renderSelectedDay();
+    // also highlight preview row
+    highlightPreviewRow();
+  }
+
+  function moveMonth(delta){
+    const d = new Date(viewYear, viewMonth + delta, 1);
+    viewYear = d.getFullYear();
+    viewMonth = d.getMonth();
+    renderCalendar();
+    renderPreview();
+    // keep selectedDate if in month else keep same
+    renderSelectedDay();
+  }
+
+  function goToday(){
+    const t = new Date();
+    viewYear = t.getFullYear();
+    viewMonth = t.getMonth();
+    selectDate(window.APP.util.todayISO());
+    renderPreview();
+  }
+
+  // ====== Selected day schedule list ======
+  function renderSelectedDay(){
+    const schedule = getSchedule();
+    const schMap = buildScheduleMap(schedule);
+    const arr = schMap.get(selectedDate) || [];
+
+    document.getElementById('selTitle').textContent = `${selectedDate} 일정 (${arr.length}건)`;
+
+    const box = document.getElementById('selList');
+    box.innerHTML='';
+    if(arr.length===0){
+      box.innerHTML = '<div class="li" style="color:rgba(229,231,235,.70)">등록된 일정이 없습니다.</div>';
+      return;
+    }
+
+    arr.forEach(s=>{
+      const div=document.createElement('div');
+      div.className='li';
+      const time = s.time ? s.time : '';
+      div.innerHTML = `<div class="meta">${window.APP.util.escapeHtml(time)}</div><div class="txt">${window.APP.util.escapeHtml(s.text||'')}</div>`;
+      box.appendChild(div);
+    });
+  }
+
+  // ====== Preview (monthly) ======
+  function renderPreview(){
+    const schedule = getSchedule();
+    // 홈 미리보기: 최근 일정(날짜 기준) 10개만
+    const byDate = new Map();
+    schedule.forEach(s=>{
+      if(!s || !s.date || !s.text) return;
+      if(!byDate.has(s.date)) byDate.set(s.date, []);
+      byDate.get(s.date).push(s);
+    });
+
+    const dates = [...byDate.keys()].sort((a,b)=> String(b).localeCompare(String(a))).slice(0,10);
+
+    const body = document.getElementById('previewBody');
+    body.innerHTML='';
+
+    if(dates.length===0){
+      body.innerHTML = '<tr><td colspan="3" style="color:rgba(229,231,235,.70)">일정이 없습니다.</td></tr>';
+      return;
+    }
+
+    dates.forEach(d=>{
+      const arr = byDate.get(d) || [];
+      const firstText = window.APP.util.short(arr[0].text||'', 10);
+      const tr=document.createElement('tr');
+      tr.dataset.date = d;
+      tr.style.cursor='pointer';
+      tr.innerHTML = `
+        <td>${window.APP.util.escapeHtml(d)}</td>
+        <td>${window.APP.util.escapeHtml(firstText)}</td>
+        <td class="right">${arr.length}</td>
+      `;
+      tr.addEventListener('click', ()=>{
+        // move calendar view if needed
+        const yy=parseInt(d.slice(0,4),10);
+        const mm=parseInt(d.slice(5,7),10)-1;
+        viewYear=yy; viewMonth=mm;
+        selectDate(d);
+      });
+      body.appendChild(tr);
+    });
+
+    highlightPreviewRow();
+  }
+
+  function highlightPreviewRow(){
+    const rows = document.querySelectorAll('#previewBody tr');
+    rows.forEach(r=>{
+      if(r.dataset.date === selectedDate){
+        r.style.outline='2px solid rgba(37,99,235,.65)';
+        r.style.background='rgba(37,99,235,.08)';
+      }else{
+        r.style.outline='none';
+        r.style.background='transparent';
+      }
+    });
+  }
+
+  // ====== Change log ======
+  function renderChangeLog(){
+    const arr = getChangeLog();
+    // HOME에서는 최근 100건만 관리하고, 10개씩 보여줍니다.
+    const all = arr.slice(-100).reverse();
+    const pageSize = 10;
+    const totalPages = Math.max(1, Math.ceil(all.length / pageSize));
+    if(window.__chPage==null) window.__chPage = 0;
+    if(window.__chPage > totalPages-1) window.__chPage = totalPages-1;
+    if(window.__chPage < 0) window.__chPage = 0;
+    const start = window.__chPage * pageSize;
+    const last = all.slice(start, start + pageSize);
+
+    // pager UI
+    const infoEl = document.getElementById('chPageInfo');
+    if(infoEl) infoEl.textContent = `${totalPages===0?0:(window.__chPage+1)} / ${totalPages}`;
+    const prevBtn = document.getElementById('chPrevBtn');
+    const nextBtn = document.getElementById('chNextBtn');
+    if(prevBtn) prevBtn.disabled = (window.__chPage<=0);
+    if(nextBtn) nextBtn.disabled = (window.__chPage>=totalPages-1);
+
+    const body = document.getElementById('chBody');
+    body.innerHTML='';
+
+    if(last.length===0){
+      body.innerHTML = '<tr><td colspan="2" style="color:rgba(229,231,235,.70)">변동내역이 없습니다.</td></tr>';
+      return;
+    }
+
+    last.forEach(x=>{
+      const tr=document.createElement('tr');
+      const t = fmtTime(x.ts);
+      const msg = x.type ? `[${x.type}] ${x.message||''}` : (x.message||'');
+      tr.innerHTML = `<td style="width:120px">${window.APP.util.escapeHtml(t)}</td><td>${window.APP.util.escapeHtml(msg)}</td>`;
+      body.appendChild(tr);
+    });
+  }
+
+  function chPrev(){
+    window.__chPage = (window.__chPage||0) - 1;
+    renderChangeLog();
+  }
+  function chNext(){
+    window.__chPage = (window.__chPage||0) + 1;
+    renderChangeLog();
+  }
+
+
+
+  // ====== Stock mini ======
+  function renderStockMini(){
+    // visible list: for selection/active use
+    const visibleMats = (window.APP.items && window.APP.items.getVisible) ? window.APP.items.getVisible('materials') : getMaterials();
+    const visibleSet = new Set((visibleMats||[]).map(x=>String(x)));
+
+    const base = getStockBase();
+    const logs = getMaterialLog();
+
+    // used qty map from logs (including hidden/deleted materials referenced in history)
+    const usedMap = {};
+    logs.forEach(x=>{
+      if(!x || !x.material) return;
+      const m=String(x.material);
+      const q=parseInt(x.qty||0,10)||0;
+      usedMap[m]=(usedMap[m]||0)+q;
+    });
+
+    // union of names: visible list + anything referenced by base/logs
+    const names = new Set();
+    (visibleMats||[]).forEach(n=>names.add(String(n)));
+    Object.keys(base||{}).forEach(n=>names.add(String(n)));
+    Object.keys(usedMap||{}).forEach(n=>names.add(String(n)));
+
+    const rows = Array.from(names).map(m=>{
+      const init=parseInt((base||{})[m]||0,10)||0;
+      const used=parseInt((usedMap||{})[m]||0,10)||0;
+      const rem=init-used;
+
+      const hidden = (window.APP.items && window.APP.items.isHidden) ? window.APP.items.isHidden('materials', m) : false;
+      const deleted = hidden || !visibleSet.has(m); // 숨김이거나, 현재 목록에서 제거된 경우
+      return {m, init, used, rem, deleted};
+    }).sort((a,b)=>a.rem-b.rem);
+
+    const body=document.getElementById('stockMini');
+    body.innerHTML='';
+
+    if(rows.length===0){
+      body.innerHTML='<tr><td colspan="4" style="color:rgba(229,231,235,.70)">자재 목록이 없습니다.</td></tr>';
+      return;
+    }
+
+    // show top 12
+    rows.slice(0,12).forEach(r=>{
+      const tr=document.createElement('tr');
+      const nameHtml = r.deleted ? `<span class="deleted">${window.APP.util.escapeHtml(r.m)}</span>` : window.APP.util.escapeHtml(r.m);
+      tr.innerHTML = `
+        <td>${nameHtml}</td>
+        <td class="right">${r.init}</td>
+        <td class="right">${r.used}</td>
+        <td class="right">${r.rem}</td>
+      `;
+      body.appendChild(tr);
+    });
+  }
+
+  // ====== KPI ======
+  function renderKPIs(schMap){
+    const todayStr = window.APP.util.todayISO();
+    const todayArr = schMap.get(todayStr) || [];
+
+    // month count
+    const yymm = monthKey(viewYear, viewMonth);
+    let monthCount = 0;
+    for(const [d, arr] of schMap){
+      if(d.startsWith(yymm)) monthCount += arr.length;
+    }
+
+    // open worklog count (status != 처리완료)
+    const wl = getWorklog();
+    const open = wl.filter(x=>x && (x.status||'') !== '처리완료').length;
+
+    // low stock count (exclude hidden materials)
+    const mats = (window.APP.items && window.APP.items.getVisible) ? window.APP.items.getVisible('materials') : getMaterials();
+    const base = getStockBase();
+    const logs = getMaterialLog();
+    const usedMap = {};
+    logs.forEach(x=>{
+      if(!x || !x.material) return;
+      const m=String(x.material);
+      const q=parseInt(x.qty||0,10)||0;
+      usedMap[m]=(usedMap[m]||0)+q;
+    });
+    const warnTh = 5;
+    let low = 0;
+    mats.forEach(m=>{
+      const init=parseInt(base[m]||0,10)||0;
+      const used=parseInt(usedMap[m]||0,10)||0;
+      const rem=init-used;
+      if(rem <= warnTh) low++;
+    });
+
+    document.getElementById('k_todaySch').textContent = String(todayArr.length);
+    document.getElementById('k_todaySchSub').textContent = todayArr.length ? window.APP.util.short(todayArr[0].text||'', 22) : '-';
+
+    document.getElementById('k_monthSch').textContent = String(monthCount);
+    document.getElementById('k_monthSchSub').textContent = yymm;
+
+    document.getElementById('k_openWork').textContent = String(open);
+
+    document.getElementById('k_lowStock').textContent = String(low);
+  }
+
+  // ====== Navigation ======
+  function jumpToSchedule(){
+    localStorage.setItem('home_openScheduleDate', selectedDate);
+    // index iframe will load schedule if user clicks in sidebar; here just hint
+    alert('좌측 메뉴에서 일정표를 눌러 주세요. (선택한 날짜가 자동으로 입력됩니다)');
+  }
+  function jumpToMaterials(){
+    alert('좌측 메뉴에서 자재일지를 눌러 주세요.');
+  }
+
+  // ====== Refresh ======
+  function refreshAll(){
+    window.__chPage = 0;
+    window.APP.migrate.run();
+    renderCalendar();
+    renderSelectedDay();
+    renderPreview();
+    renderChangeLog();
+    renderStockMini();
+  }
+
+  // ====== Init ======
+  document.addEventListener('DOMContentLoaded', ()=>{
+    window.APP.migrate.run();
+
+    const t = new Date();
+    viewYear = t.getFullYear();
+    viewMonth = t.getMonth();
+    selectedDate = window.APP.util.todayISO();
+
+    renderCalendar();
+    renderSelectedDay();
+    renderPreview();
+    renderChangeLog();
+    renderStockMini();
+
+    window.addEventListener('storage', (e)=>{
+      // any of these changes refresh
+      const keys = [K.SCHEDULE, K.WORKLOG, K.MATERIAL_LOG, K.STOCK_BASE, K.CHANGELOG, K.MATERIALS];
+      if(keys.includes(e.key)) refreshAll();
+    });
+  });
+</script>
+</body>
+</html>

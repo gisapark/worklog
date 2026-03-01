@@ -200,24 +200,6 @@
 
   function safeParse(str, fallback){ return window.APP.util.safeParseJSON(str, fallback); }
   function esc(s){ return window.APP.util.escapeHtml(s); }
-function dateClass(d){
-  const ds=String(d||'').slice(0,10);
-  const hol=(window.APP.holidays&&APP.holidays.isHoliday)?APP.holidays.isHoliday(ds):false;
-  if(hol) return 'dateHol';
-  if(window.APP.util.isSunday(ds)) return 'dateSun';
-  if(window.APP.util.isSaturday(ds)) return 'dateSat';
-  return '';
-}
-function dateLabelWithHoliday(d){
-  const ds=String(d||'').slice(0,10);
-  const base=window.APP.util.dateLabel(ds);
-  const hn=(window.APP.holidays&&APP.holidays.name)?APP.holidays.name(ds):'';
-  return hn?(base+' '+hn):base;
-}
-function renderDate(d){
-  const ds=String(d||'').slice(0,10);
-  return `<span class=\"dateTag ${dateClass(ds)}\">${esc(dateLabelWithHoliday(ds))}</span>`;
-}
   function today(){ return window.APP.util.todayISO(); }
 
   function getMaterials(){
